@@ -1,0 +1,134 @@
+// app/screens/plan.js — התכנית החודשית
+// תכנית חדשה לכל חודש, בלי העברה אוטומטית; «בפועל» נגזר מתשלומי הכרטיס בחודש התכנית.
+import { readNum } from '../../core/util.js';
+import { pendTag } from '../../core/sync.js';
+import { comboValue, esc, openModal, toast } from '../../core/ui.js';
+import { APP_FIRST_MONTH, LK_AMBASSADOR, LK_SECTION, MSG_PICK_DONOR, PLAN_KINDS, TTL_PLAN_EDIT, TTL_PLAN_NEW } from '../constants.js';
+import { state } from '../state.js';
+import { icon } from '../icons.js';
+import { snapShare } from '../snap.js';
+import { $, dmyDate, donorById, donorFieldHTML, donorName, emptyBox, gSortPlan, ils, insert,
+         lookupLabels, monthLabel, nextSort, nullable, pendRowKey, planActual, planGroup, planOfMonth, pledgesOfDonor,
+         selectHTML, sum, update, val } from '../domain.js';
+
+function viewPlan() {
+  var m = state.planMonth, list = gSortPlan(planOfMonth(m));
+  var live = list.filter(function (r) { return !r.irrelevant; });
+  var exp = sum(live, function (r) { return r.expected; }), act = sum(live, planActual);
+  var h = '<section class="card">' +
+    '<div class="monthnav">' +
+      '<button class="btn ghost sm ic" data-act="plan-month" data-d="-1" aria-label="חודש קודם"' + (m <= APP_FIRST_MONTH ? ' disabled' : '') + '>' + icon('prev') + '</button>' +
+      '<b>' + esc(monthLabel(m)) + '</b>' +
+      '<button class="btn ghost sm ic" data-act="plan-month" data-d="1" aria-label="חודש הבא">' + icon('next') + '</button>' +
+    '</div>' +
+    '<div class="hero-stats stats-3">' +
+      '<div class="stat"><span>שורות</span><b>' + live.length + '</b></div>' +
+      '<div class="stat"><span>צפי</span><b>' + ils(exp) + '</b></div>' +
+      '<div class="stat ok"><span>בפועל</span><b>' + ils(act) + '</b></div>' +
+    '</div>' +
+  '</section>';
+
+  h += '<section class="card"><h2>התכנית<span class="cnt">' + list.length + '</span>' +
+    '<span class="sp"><button class="btn sm" data-act="plan-new">' + icon('plus') + 'שורה</button></span></h2>';
+  if (!list.length) h += emptyBox('plan', 'אין עדיין שורות בתכנית של החודש');
+  else {
+    // קבוצה לכל קטגוריה — שמה בכותרת, ולא בכל שורה; כל הקבוצות סגורות בכניסה, ונפתחות ונסגרות בלחיצה על הכותרת.
+    // בקצה הכותרת — ייצוא הקבוצה כתמונה.
+    var lastAmb = null;
+    h += list.map(function (r) {
+      var amb = planGroup(r), head = '';
+      if (amb !== lastAmb) {
+        var on = !!state.planOpen[amb];
+        head = '<div class="list-sub plan-sub">' +
+          '<button class="plan-tg" data-act="plan-grp" data-amb="' + esc(amb) + '" aria-expanded="' + on + '">' +
+            '<span class="chev">' + icon('down') + '</span>' + planHeadHTML(list, amb) + '</button>' +
+          '<button class="btn ghost xs ic" data-act="plan-share" data-amb="' + esc(amb) + '" aria-label="ייצוא תמונה" title="ייצוא תמונה">' + icon('share') + '</button>' +
+        '</div>';
+        lastAmb = amb;
+      }
+      // קטגוריה סגורה — הכותרת בלבד; השורות נפרשות בלחיצה עליה.
+      if (!state.planOpen[amb]) return head;
+      return head + planRowHTML(r, false);
+    }).join('');
+  }
+  h += '</section>';
+  return h;
+}
+
+// כותרת קטגוריה — שם · מונה · בפועל / צפי · אחוז; «לא רלוונטי» אינו נספר.
+function planHeadHTML(list, amb) {
+  var grp = list.filter(function (x) { return planGroup(x) === amb; });
+  var ge = 0, ga = 0;
+  grp.forEach(function (x) { if (!x.irrelevant) { ge += +x.expected || 0; ga += planActual(x); } });
+  return '<span class="nm">' + esc(amb) + '</span><span class="cnt">' + grp.length + '</span>' +
+    '<span class="sum">' + ils(ga) + ' / ' + ils(ge) + (ge > 0 ? ' · ' + Math.round(ga / ge * 100) + '%' : '') + '</span>';
+}
+
+// שורת תכנית — «צפי מול בפועל»; בתמונה (img) בלי פעולות.
+function planRowHTML(r, img) {
+  var a = planActual(r), id = esc(r.client_id);
+  var pct = r.expected > 0 ? Math.min(100, Math.round(a / r.expected * 100)) : (a > 0 ? 100 : 0);
+  return '<div class="pr' + (r.kind === 'התרמה' ? ' k-raise' : '') + (r.irrelevant ? ' irr' : '') + '">' +
+    '<div class="pr-main"' + (img ? '' : ' data-act="plan-edit" data-id="' + id + '"') + '>' +
+      '<b>' + esc(donorName(r.donor_client_id)) + (img ? '' : pendTag(pendRowKey('gr_plan_items', r.client_id))) + '</b>' +
+      '<small>' + esc([r.kind || '', r.ambassador || '', r.care_date ? 'טיפול ' + dmyDate(r.care_date) : '', r.note].filter(Boolean).join(' · ')) + '</small>' +
+    '</div>' +
+    '<span class="pr-fig"><b>' + ils(a) + '</b> / ' + ils(r.expected) + '</span>' +
+    '<div class="pr-bar"><i class="' + (pct >= 100 ? 'full' : '') + '" style="width:' + pct + '%"></i></div>' +
+    (img ? '' : '<button class="pr-menu" data-act="plan-irr" data-id="' + id + '" aria-pressed="' + !!r.irrelevant + '" title="' +
+      (r.irrelevant ? 'סימון כרלוונטי' : 'סימון כלא רלוונטי') + '" aria-label="' + (r.irrelevant ? 'סימון כרלוונטי' : 'סימון כלא רלוונטי') + '">' + icon('dots') + '</button>') +
+  '</div>';
+}
+
+// ייצוא תכנית של קטגוריה — הכותרת, הסיכום וכל השורות פרושות.
+function planShare(amb) {
+  var m = state.planMonth, list = gSortPlan(planOfMonth(m));
+  var rows = list.filter(function (x) { return planGroup(x) === amb; });
+  if (!rows.length) return;
+  snapShare('<div class="snap-hd"><small>תכנית ' + esc(monthLabel(m)) + '</small><h2>' + esc(amb) + '</h2></div>' +
+    '<div class="list-sub plan-sub snap-sub">' + planHeadHTML(list, amb).replace(/^<span class="nm">.*?<\/span>/, '<span class="nm">שורות</span>') + '</div>' +
+    rows.map(function (r) { return planRowHTML(r, true); }).join(''), 'תכנית ' + monthLabel(m) + ' — ' + amb);
+}
+
+// הקטגוריה כברירה — של ההתחייבות האחרונה של הכרטיס
+function planSecOf(d) {
+  var ps = d ? pledgesOfDonor(d.client_id).filter(function (p) { return p.section; })
+    .sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); }) : [];
+  return ps.length ? ps[0].section : '';
+}
+
+// השורה מקושרת לכרטיס; כרטיס שאינו קיים נוצר מהבורר. הקטגוריה והשגריר — מהכרטיס כברירה, וניתנים לשינוי.
+function formPlan(r) {
+  var d = r ? donorById(r.donor_client_id) : null;
+  openModal(r ? TTL_PLAN_EDIT : TTL_PLAN_NEW + monthLabel(state.planMonth),
+    '<div class="fld"><span>כרטיס *</span>' + donorFieldHTML('pl-donor', 'donor-plan', r ? r.donor_client_id : null) + '</div>' +
+    '<label class="fld"><span>קטגוריה</span>' + selectHTML('pl-sec', lookupLabels(LK_SECTION), r ? r.section : planSecOf(d), '— ללא —') + '</label>' +
+    '<div class="f2">' +
+      '<label class="fld"><span>סוג</span><select class="inp" id="pl-kind">' + PLAN_KINDS.map(function (k) {
+        return '<option' + ((r ? r.kind : PLAN_KINDS[0]) === k ? ' selected' : '') + '>' + esc(k) + '</option>';
+      }).join('') + '</select></label>' +
+      '<label class="fld"><span>צפי</span><input class="inp" id="pl-exp" inputmode="decimal" value="' + esc(r && r.expected != null ? r.expected : '') + '"></label>' +
+    '</div>' +
+    '<div class="f2">' +
+      '<label class="fld"><span>איש קשר</span>' + selectHTML('pl-amb', lookupLabels(LK_AMBASSADOR), r ? r.ambassador : (d && d.ambassador) || '', '— ללא —') + '</label>' +
+      '<label class="fld"><span>תאריך טיפול</span><input class="inp" type="date" id="pl-care" value="' + esc(r && r.care_date ? r.care_date : '') + '"></label>' +
+    '</div>' +
+    '<label class="fld"><span>הערות</span><input class="inp" id="pl-note" value="' + esc(r ? r.note || '' : '') + '"></label>',
+    '<button class="btn ghost" data-act="modal-close">ביטול</button>' +
+    (r ? '<button class="btn danger" data-act="plan-del" data-id="' + esc(r.client_id) + '">מחיקה</button>' : '') +
+    '<button class="btn" data-act="plan-save" data-id="' + esc(r ? r.client_id : '') + '" data-ksave>' + icon('save') + 'שמירה</button>');
+}
+
+function savePlan(id) {
+  var donor = comboValue('pl-donor');
+  if (!donor) { toast(MSG_PICK_DONOR, null, 'warn'); return; }
+  var exp = $('#pl-exp');
+  var row = { donor_client_id: donor, kind: val('pl-kind') || PLAN_KINDS[0],
+              expected: exp && exp.value.trim() !== '' ? readNum(exp, 0) : null,
+              section: nullable(val('pl-sec')), ambassador: nullable(val('pl-amb')), care_date: nullable(val('pl-care')), note: nullable(val('pl-note')) };
+  if (id) return update('gr_plan_items', id, row);
+  return insert('gr_plan_items', Object.assign(row, { plan_month: state.planMonth, irrelevant: false,
+                                                     sort: nextSort(planOfMonth(state.planMonth)) }));
+}
+
+export { formPlan, planShare, savePlan, viewPlan };

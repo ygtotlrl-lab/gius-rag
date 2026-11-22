@@ -1,0 +1,241 @@
+package com.gius.rag;
+
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
+import android.graphics.Color;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.Toast;
+
+import androidx.core.splashscreen.SplashScreen;
+
+// tools/java/ShellActivity.java.in — מעטפת ה-WebView, הליבה המשותפת
+public abstract class ShellActivity extends Activity {
+
+    private static final int FILE_CHOOSER_REQUEST = 1001;
+
+    protected abstract String appUrl();
+
+    // המשפט המלא ולא שם האפליקציה בלבד — הפועל מתאים למין השם (הצליחה / הצליח).
+    protected abstract String offlineLine();
+
+    // צבע כפתור הניסיון החוזר בדף האופליין, כערך hex של CSS.
+    protected abstract String accentColor();
+
+    // ריק בכוונה — נדרס רק כשיש גשר מוצהר.
+    protected void installBridge() { }
+
+    // גשר ההתראות — ריק בכוונה, נדרס רק באפליקציה שמצהירה android.push.
+    protected void installPush() { }
+
+    // גשר הכניסה עם Google — ריק בכוונה, נדרס רק באפליקציה שמצהירה android.google.
+    protected void installGoogle() { }
+
+    // נקרא בכל ניווט, בתחילתו ובסופו; ריק בכוונה כברירת מחדל.
+    protected void onShellNavigation(String url) { }
+
+    protected WebView webView;
+    private ValueCallback<Uri[]> filePathCallback;
+    // נדלק כשדף אמיתי כלשהו צויר — כך שגיאה מאוחרת אינה מוחקת אפליקציה חיה.
+    private boolean loadedOnce = false;
+
+    // מסך הפתיחה — האייקון במרכז על רקע לבן, לפחות SPLASH_MIN_MS ועד שהמסך הראשון צויר: #view מלא, ובלי מציין הטעינה של הדף.
+    // אות שלא מגיע — המסך יורד ממילא אחרי SPLASH_MAX_MS.
+    private static final long SPLASH_MIN_MS = 1000;
+    private static final long SPLASH_MAX_MS = 3000;
+    private long splashAt = 0;
+    private static final long SPLASH_POLL_MS = 100;
+    private static final String SPLASH_READY_JS =
+        "(function(){var v=document.getElementById('view');return !!v&&v.childElementCount>0&&!v.querySelector('.view-loading');})()";
+    private boolean shellReady = false;
+
+    private void splashPoll() {
+        if (shellReady || webView == null) return;
+        webView.evaluateJavascript(SPLASH_READY_JS, new ValueCallback<String>() {
+            @Override public void onReceiveValue(String v) {
+                if ("true".equals(v)) shellReady = true;
+                else webView.postDelayed(new Runnable() { @Override public void run() { splashPoll(); } }, SPLASH_POLL_MS);
+            }
+        });
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        splashAt = android.os.SystemClock.uptimeMillis();
+        SplashScreen splash = SplashScreen.installSplashScreen(this);
+        super.onCreate(savedInstanceState);
+        splash.setKeepOnScreenCondition(new SplashScreen.KeepOnScreenCondition() {
+            @Override public boolean shouldKeepOnScreen() {
+                return !shellReady || android.os.SystemClock.uptimeMillis() - splashAt < SPLASH_MIN_MS;
+            }
+        });
+
+        webView = new WebView(this);
+        // הרקע של מסך הפתיחה גם מתחת לדף — בלי הבהוב בין השניים.
+        webView.setBackgroundColor(Color.WHITE);
+        setContentView(webView);
+        webView.postDelayed(new Runnable() { @Override public void run() { shellReady = true; } }, SPLASH_MAX_MS);
+
+        WebSettings s = webView.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true); // localStorage — supabase-js קורא ממנו בעלייה; האחסון של האפליקציה — IndexedDB
+        s.setDatabaseEnabled(true);
+        s.setLoadWithOverviewMode(true);
+        s.setUseWideViewPort(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        // האתר https בלבד — אין סיבה להתיר תוכן מעורב גורף.
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        // אין צורך בגישת file:// או content:// — דבר אינו נטען מהדיסק.
+        s.setAllowFileAccess(false);
+        s.setAllowContentAccess(false);
+
+        webView.setWebViewClient(new ShellWebViewClient());
+
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView wv, ValueCallback<Uri[]> cb, FileChooserParams params) {
+                if (filePathCallback != null) { filePathCallback.onReceiveValue(null); }
+                filePathCallback = cb;
+                try {
+                    startActivityForResult(params.createIntent(), FILE_CHOOSER_REQUEST);
+                } catch (Exception e) {
+                    filePathCallback = null;
+                    return false;
+                }
+                return true;
+            }
+        });
+
+        installBridge();
+        installPush();
+        installGoogle();
+
+        // restoreState מחזיר null כשאין היסטוריה לשחזר — אז, וגם בהפעלה קרה רגילה, נטען האתר.
+        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
+            webView.loadUrl(appUrl());
+        } else {
+            loadedOnce = true;
+            shellReady = true;
+        }
+    }
+
+    private class ShellWebViewClient extends WebViewClient {
+
+        // http/https נשארים תמיד ב-WebView — הדפדפן החיצוני הוא Chrome, שמסנני התוכן במכשירים חוסמים.
+        // שאר הסכמות (tel:, mailto:, whatsapp:) אין להן מרנדר כאן, והן עוברות למערכת.
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView wv, WebResourceRequest request) {
+            return handleUrl(request.getUrl());
+        }
+
+        @SuppressWarnings("deprecation")
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView wv, String url) {
+            return handleUrl(Uri.parse(url));
+        }
+
+        private boolean handleUrl(Uri uri) {
+            String scheme = uri.getScheme();
+            if (scheme == null) return false;
+            if (scheme.equals("http") || scheme.equals("https")) return false;
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                // אין FLAG_ACTIVITY_NEW_TASK מהקשר Activity חי — הקישור נפתח מעל המעטפת, וחזרה מחזירה אליה.
+                startActivity(intent);
+            } catch (ActivityNotFoundException e) {
+                Toast.makeText(ShellActivity.this, "אין אפליקציה שיודעת לפתוח את הקישור", Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        }
+
+        @Override
+        public void onPageStarted(WebView wv, String url, android.graphics.Bitmap favicon) {
+            onShellNavigation(url);
+        }
+
+        @Override
+        public void onPageFinished(WebView wv, String url) {
+            onShellNavigation(url);
+            if (url != null && !url.startsWith("data:")) { loadedOnce = true; splashPoll(); }
+            else shellReady = true;
+        }
+
+        @Override
+        public void onReceivedError(WebView wv, WebResourceRequest request, WebResourceError error) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && request.isForMainFrame()) {
+                showOfflinePage();
+            }
+        }
+
+        @SuppressWarnings("deprecation")
+        @Override
+        public void onReceivedError(WebView wv, int errorCode, String description, String failingUrl) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) showOfflinePage();
+        }
+    }
+
+    // רץ רק בהפעלה קרה בלי רשת ובלי מטמון ה-SW — אחרי טעינה ראשונה ה-SW עונה אופליין.
+    // מוגש כ-text/html דרך loadDataWithBaseURL ולא כמחרוזת רגילה — גוף בלי סוג תוכן אינו הודעה למשתמש.
+    protected void showOfflinePage() {
+        shellReady = true;
+        if (loadedOnce) return;
+        String html =
+            "<!doctype html><html lang='he' dir='rtl'><head>"
+            + "<meta charset='utf-8'>"
+            + "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            + "<style>"
+            + "body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;"
+            + "justify-content:center;gap:18px;background:#f4f6f9;color:#0f172a;text-align:center;padding:24px;"
+            + "font-family:system-ui,-apple-system,'Segoe UI',Arial,sans-serif}"
+            + "h1{font-size:20px;margin:0}p{margin:0;color:#475569;line-height:1.6}"
+            + "a{background:" + accentColor() + ";color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:700}"
+            + "</style></head><body>"
+            + "<h1>אין חיבור לאינטרנט</h1>"
+            + "<p>" + offlineLine() + "<br>בדוק את החיבור ונסה שוב.</p>"
+            + "<a href='" + appUrl() + "'>נסה שוב</a>"
+            + "</body></html>";
+        webView.loadDataWithBaseURL(null, html, "text/html", "utf-8", null);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == FILE_CHOOSER_REQUEST && filePathCallback != null) {
+            filePathCallback.onReceiveValue(
+                WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+            filePathCallback = null;
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (webView != null) webView.saveState(outState);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    protected void toastUi(final String msg) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                Toast.makeText(ShellActivity.this, msg, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+}

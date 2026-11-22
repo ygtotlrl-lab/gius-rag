@@ -1,0 +1,322 @@
+#!/usr/bin/env node
+// tools/gen-app.mjs — קובצי הפלטפורמה מהתצורה
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { runInNewContext } from 'node:vm';
+
+export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// התצורה נקראת כסקריפט שמציב את self.APP, כפי שהדפדפן קורא אותה — ולא מעותק JSON שני שמתיישן.
+export function loadApp() {
+  const ctx = { self: {} };
+  runInNewContext(readFileSync(join(ROOT, 'app.config.js'), 'utf8'), ctx, { filename: 'app.config.js' });
+  if (!ctx.self.APP) throw new Error('app.config.js אינו מציב את self.APP');
+  return ctx.self.APP;
+}
+export const APP = loadApp();
+
+const MARK = 'נוצר מהתצורה — app.config.js, ב-node tools/gen-app.mjs: אין לערוך ביד';
+const ICON_RE = /^(icon-192|icon-512|icon-maskable-512)\.[0-9a-f]{8}\.png$/;
+
+// שמות האייקונים נקראים מהתיקייה — השם נושא hash של התוכן, ומחולל האייקונים הוא שכתב אותו.
+function iconNames() {
+  const out = {};
+  for (const f of readdirSync(join(ROOT, 'icons'))) {
+    const m = ICON_RE.exec(f);
+    if (m) out[m[1]] = 'icons/' + f;
+  }
+  for (const k of ['icon-192', 'icon-512', 'icon-maskable-512'])
+    if (!out[k]) throw new Error(`icons/ — חסר ${k}`);
+  return out;
+}
+
+function manifest(A) {
+  const ic = iconNames();
+  const icon = (src, size, purpose) =>
+    `    { "src": ${JSON.stringify(src)}, "sizes": "${size}x${size}", "type": "image/png", "purpose": "${purpose}" }`;
+  const head = {
+    '//': MARK.replace(/`/g, ''),
+    name: A.name, short_name: A.shortName, description: A.description,
+    id: `/${A.id}/`, start_url: './index.html', scope: `/${A.id}/`,
+    display: 'standalone', background_color: A.colors.background, theme_color: A.colors.theme,
+    lang: 'he', dir: 'rtl', orientation: 'portrait'
+  };
+  const lines = Object.entries(head).map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)},`);
+  return '{\n' + lines.join('\n') + '\n  "icons": [\n' + [
+    icon(ic['icon-192'], 192, 'any'),
+    icon(ic['icon-512'], 512, 'any'),
+    icon(ic['icon-maskable-512'], 512, 'maskable')
+  ].join(',\n') + '\n  ]\n}\n';
+}
+
+function androidManifest(A) {
+  const share = A.android.share;
+  const launch = Object.values(A.android.launch);
+  return `<?xml version="1.0" encoding="utf-8"?>
+<!-- ${MARK} -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+${A.android.push === true ? `    <!-- התראות — אנדרואיד 13 ומעלה שואל את המשתמש, מלחיצה על «הפעלה» באפליקציה -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+` : ''}${A.android.dnd === true ? `    <!-- «השתקה בזמן לימוד» — המעטפת מדליקה «נא לא להפריע» כשהיא בחזית -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+` : ''}${share ? `
+    <!-- מ-API 30 resolveActivity() של גשר השיתוף רואה רק מה שמוצהר כאן -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="*/*" />
+        </intent>
+    </queries>
+` : ''}${launch.length ? `
+    <!-- מ-API 30 המעטפת רואה רק אפליקציה שמוצהרת כאן — בלעדיה מותקנת נראית חסרה, והקישור נופל לחנות -->
+    <queries>
+${launch.map(p => `        <package android:name="${p}" />`).join('\n')}
+    </queries>
+` : ''}
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="${A.name}"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Shell.Starting"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+${A.android.push === true ? `
+        <!-- ההתראות (FCM) — ההודעה נבנית במעטפת, בערוץ אחד -->
+        <service
+            android:name=".ShellPushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="alerts" />
+` : ''}${share ? `
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="\${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+` : ''}
+    </application>
+</manifest>
+`;
+}
+
+function appGradle(A) {
+  return `// ${MARK}
+plugins {
+    id 'com.android.application'${A.android.push === true ? `
+    // google-services.json שלצד הקובץ — הרישום של האפליקציה הזו
+    id 'com.google.gms.google-services'` : ''}
+}
+
+android {
+    namespace '${A.android.package}'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "${A.android.package}"
+        minSdk 21
+        targetSdk 34
+        versionCode ${A.android.versionCode}
+        versionName "${A.android.versionName}"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // מסך הפתיחה — אותו מסך בכל גרסאות האנדרואיד, והמעטפת מחזיקה אותו עד שהמסך הראשון צויר
+    implementation 'androidx.core:core-splashscreen:1.0.1'${A.android.share ? `
+    implementation 'androidx.core:core:1.13.1'
+    // WebViewCompat.addWebMessageListener — רשימת המקורות של גשר השיתוף נאכפת ב-WebView עצמו, לכל frame
+    implementation 'androidx.webkit:webkit:1.11.0'` : ''}${A.android.push === true ? `
+    // ההתראות — FCM
+    implementation platform('com.google.firebase:firebase-bom:33.7.0')
+    implementation 'com.google.firebase:firebase-messaging'` : ''}${A.android.google ? `
+    // הכניסה עם Google — Credential Manager, ואסימון הזהות של Google
+    implementation 'androidx.credentials:credentials:1.3.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.3.0'
+    implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'` : ''}
+}
+`;
+}
+
+// שורש הפרויקט — הגרסאות של התוספים; google-services רק באפליקציה עם התראות
+function rootGradle(A) {
+  return `// ${MARK}
+plugins {
+    id 'com.android.application' version '8.5.2' apply false${A.android.push === true ? `
+    id 'com.google.gms.google-services' version '4.4.2' apply false` : ''}
+}
+`;
+}
+
+function settingsGradle(A) {
+  return `// ${MARK}
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "${A.id}"
+include ':app'
+`;
+}
+
+function launcherBg(A) {
+  const b = A.android.launcherBg;
+  const body = b.kind === 'gradient'
+    ? `    <gradient
+        android:type="linear"
+        android:angle="${b.angle}"
+        android:startColor="${b.start}"
+        android:endColor="${b.end}"/>`
+    : `    <solid android:color="${b.color}"/>`;
+  if (b.kind !== 'gradient' && b.kind !== 'solid') throw new Error(`launcherBg.kind — ${b.kind}`);
+  return `<?xml version="1.0" encoding="utf-8"?>
+<!-- ${MARK} -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+${body}
+</shape>
+`;
+}
+
+// גשר השיתוף נוצר רק כש-android.share מוצהר, וגשר ההדפסה — רק כש-android.share.print דולק, פתיחת אפליקציה אחרת — רק כש-android.launch אינו ריק, והיציאה — רק כש-android.exit דולק, וההשתקה — רק באפליקציה שמצהירה android.dnd; אחרת הקטע יורד כולו.
+function javaFile(name) {
+  return A => {
+    const share = A.android.share;
+    if (!A.android.launch) throw new Error('android.launch — לא מוצהר; ריק הוא {}');
+    const launch = Object.values(A.android.launch);
+    const jstr = v => JSON.stringify(String(v)).slice(1, -1);
+    const u = new URL(A.android.url);
+    const vals = {
+      PACKAGE: A.android.package, URL: jstr(A.android.url), OFFLINE: jstr(A.android.offlineLine),
+      ACCENT: jstr(A.android.accent), ORIGIN: jstr(u.origin), HOST: jstr(u.host),
+      FILEPREFIX: jstr(A.prefix), CHOOSER: jstr(share ? share.chooser : ''),
+      LAUNCH: launch.map(p => '"' + jstr(p) + '"').join(', '),
+      GOOGLE: jstr(A.android.google || '')
+    };
+    const tmpl = readFileSync(join(ROOT, 'tools', 'java', name + '.java.in'), 'utf8');
+    if (typeof A.android.exit !== 'boolean') throw new Error('android.exit — לא מוצהר; true או false');
+    const on = { share: !!share, print: !!(share && share.print), launch: launch.length > 0, exit: A.android.exit, dnd: A.android.dnd === true, push: A.android.push === true, google: !!A.android.google };
+    // גשר ההדפסה יושב בתוך קטע השיתוף — הקטעים הפנימיים נפתרים ראשונים.
+    const block = k => new RegExp(`^\\/\\/@@(${k})\\n([\\s\\S]*?)^\\/\\/@@end\\n`, 'gm');
+    const body = tmpl.replace(block('print'), (m, k, inner) => on[k] ? inner : '')
+      .replace(block('share|launch|exit|dnd|push|google'), (m, k, inner) => on[k] ? inner : '');
+    return body.replace(/@@([A-Z]+)@@/g, (m, k) => {
+      if (!(k in vals)) throw new Error(`${name}.java.in — אין ערך ל-${k}`);
+      return vals[k];
+    });
+  };
+}
+const JAVA = `android/app/src/main/java/${APP.android.package.replace(/\./g, '/')}`;
+
+const RES = 'android/app/src/main/res';
+// תיקיית הקבצים שגשר השיתוף חושף ל-FileProvider — רק המטמון «shared», ונוצרת רק כש-android.share מוצהר.
+function filePaths() {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<!-- ${MARK} -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="shared" path="shared/" />
+</paths>
+`;
+}
+// ערכת מסך הפתיחה — כמקובל באנדרואיד: האייקון המלא במרכז, על רקע לבן, ואחריה ערכת המעטפת.
+function splashTheme(A) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<!-- ${MARK} -->
+<resources>
+    <style name="Theme.Shell.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FFFFFF</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@android:style/Theme.Material.Light.NoActionBar</item>
+    </style>
+</resources>
+`;
+}
+
+export const TARGETS = {
+  [`${JAVA}/ShellActivity.java`]: javaFile('ShellActivity'),
+  [`${JAVA}/MainActivity.java`]: javaFile('MainActivity'),
+  ...(APP.android.push === true ? { [`${JAVA}/ShellPushService.java`]: javaFile('ShellPushService') } : {}),
+  ...(APP.android.share && APP.android.share.print ? { 'android/app/src/main/java/android/print/ShellPdfWriter.java': javaFile('ShellPdfWriter') } : {}),
+  'manifest.json': manifest,
+  'android/app/src/main/AndroidManifest.xml': androidManifest,
+  'android/app/build.gradle': appGradle,
+  'android/build.gradle': rootGradle,
+  'android/settings.gradle': settingsGradle,
+  [`${RES}/drawable/ic_launcher_background.xml`]: launcherBg,
+  [`${RES}/values/themes.xml`]: splashTheme,
+  ...(APP.android.share ? { [`${RES}/xml/file_paths.xml`]: filePaths } : {})
+};
+
+function get(path) {
+  let v = APP;
+  for (const k of path.split('.')) {
+    if (v == null || !(k in v)) throw new Error(`app.config.js — אין שדה ${path}`);
+    v = v[k];
+  }
+  return typeof v === 'object' ? JSON.stringify(v) : String(v);
+}
+
+async function main(argv) {
+  if (argv[0] === '--get') { process.stdout.write(get(argv[1] || '') + '\n'); return; }
+  const check = argv[0] === '--check';
+  // האייקונים קודם — manifest.json נושא את שמותיהם.
+  if (!check) await import('./gen-icons.mjs');
+  let changed = 0;
+  for (const [rel, make] of Object.entries(TARGETS)) {
+    const p = join(ROOT, rel), want = make(APP);
+    const have = existsSync(p) ? readFileSync(p, 'utf8') : null;
+    if (have === want) continue;
+    changed++;
+    if (check) console.error(`❌ ${rel} — אינו מה שהתצורה יוצרת`);
+    else { mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, want); }
+  }
+  if (check && changed) process.exit(1);
+  console.log(`gen-app — ${changed} קבצים ${check ? 'נבדלים' : 'נכתבו'} (${APP.id})`);
+}
+
+// main רץ רק כשהקובץ הוא נקודת הכניסה — מחולל האייקונים מייבא ממנו את התצורה, וייבוא אינו הרצה.
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url)
+  main(process.argv.slice(2)).catch(e => { console.error('❌ ' + (e && e.message || e)); process.exit(1); });

@@ -1,0 +1,585 @@
+// app/main.js — העלייה, הקליפה, מפת הפעולות והניווט
+import { appConfigure, dayToday, getDeviceId, uniqHas,
+         netTimeout } from '../core/util.js';
+import { afterSave, eraKeys, errToast, idEq, newClientId, pendAlertDismiss, pendCount, pendRender,
+         runSave, sbWatch, schedulePush, tombKill } from '../core/sync.js';
+
+import { lsOpen } from '../core/storage.js';
+import { MIRROR, mirrorKey, mirrorTables } from '../core/mirror.js';
+import { logAwait } from '../core/backup.js';
+import { bootRun } from '../core/boot-run.js';
+import { GAUTH_ACTIONS, gauthClientOpts, gauthGate, gauthHeaders, gauthUser } from '../core/gauth.js';
+import { actWire, ask, closeAsk, closeModal, comboFocus, comboInput, comboMake, comboMore, comboPick,
+         dragCancel, dragDown, dragMove, dragUp, esc, lookupSeed, modalDismiss, openModal, shellBare,
+         swApply, swHideUpdate, toast, uiNoDialog } from '../core/ui.js';
+import { KV_TABLE, MORE, MSG_DELETE_ACT, MSG_DEL_DONOR, MSG_DEL_LOOKUP,
+         MSG_DEL_PAY, MSG_DEL_SHT, MSG_DEL_SHT_CALL, MSG_DEL_PLAN, MSG_DEL_PLEDGE, MSG_DEL_SOFT, MSG_DEL_TASK,
+         MSG_NEED_VALUE, MSG_VALUE_EXISTS, PUSH_TABLES, STAGES, SUPABASE_ANON_KEY, SUPABASE_URL, TABLES,
+         TABS, APP_FIRST_MONTH, SHT_PAGE, MSG_CALL_SAVED, MSG_DELETED, MSG_GOAL_DEFAULT_SAVED, MSG_GOAL_RESET, MSG_GOAL_SAVED, MSG_REMOVED, MSG_SAVED_OK, MSG_SHT_MOVED, MSG_TASK_SAVED, TTL_MORE } from './constants.js';
+import { S, shell, state } from './state.js';
+import { $, applyMirrorToState, donorById, donorNewCancel, donorNewSave, listDef, lookupById,
+         lookupPut, lookupRows, mirrorHasData, monthKeyOf, pendRowKey, pledgeById, rowPendingKey,
+         shiftMonth, softDelete, stripRows, syncNow, tableMeta, update, viewBare } from './domain.js';
+import { icon } from './icons.js';
+import { viewDash } from './screens/dash.js';
+import { journalBody, journalShare, viewJournal } from './screens/journal.js';
+import { cardRowsHTML, cardShare, formDonor, methodPick, payPledgePick, formPay, formPledge, pSoSync, saveDonor, savePay, savePledge, soSync,
+         soUneqToggle, viewCards } from './screens/cards.js';
+import { formPlan, planShare, savePlan, viewPlan } from './screens/plan.js';
+import { formTask, saveTask, tasksBodyHTML, tasksShare, viewTasks } from './screens/tasks.js';
+import { callById, callStatusPick, formCall, formShtar, personById, saveCall, saveShtar, shtCallSave, shtClose, formNext, saveNext, shtNextTo, shtListHTML, shtMethodPick, shtOpen, shtRefresh,
+         shtStatusPick, shtStep, viewShtarot } from './screens/shtarot.js';
+import { formTarget, formTargetDefault, lookupForm, saveTarget, saveTargetDefault,
+         viewSettings } from './screens/settings.js';
+
+// ── החיווט ──
+// החיווט נמסר בשומרי קריאה — ה-CFG מוגדרים בהמשך, והשומר קורא אותם בזמן הקריאה ולא בזמן המסירה.
+appConfigure({
+  get BK_CFG() { return BK_CFG; },
+  get DEV_CFG() { return DEV_CFG; },
+  get DOM_ACTIONS() { return DOM_ACTIONS; },
+  get GAUTH_CFG() { return GAUTH_CFG; },
+  get NOTIFY_CFG() { return NOTIFY_CFG; },
+  get ERA_CFG() { return ERA_CFG; },
+  get LOOKUP_CFG() { return LOOKUP_CFG; },
+  get LS_CFG() { return LS_CFG; },
+  get MIRROR_CFG() { return MIRROR_CFG; },
+  get PEND_CFG() { return PEND_CFG; },
+  get PL_CFG() { return PL_CFG; },
+  get PUSH_CFG() { return PUSH_CFG; },
+  get RTY_CFG() { return RTY_CFG; },
+  get saveRefresh() { return saveRefresh; }
+});
+
+// הכניסה עם Google (core/gauth.js) — הלקוח של האפליקציה, וכרטיס החשבון בצורת שאר הכרטיסים;
+// וההתראות (core/push.js) — המשתמש מזוהה מול השער באסימון הסשן
+var GAUTH_CFG = {
+  sb: function () { return S.sb; },
+  card: function (title, inner) { return '<section class="card ga-card"><h2>' + esc(title) + '</h2>' + inner + '</section>'; }
+};
+var NOTIFY_CFG = {
+  auth: async function () { return { headers: await gauthHeaders() }; },
+  user: function () { return gauthUser(); }
+};
+
+// הרשימות לסידור — השורות והכתיבה של גיוס, והזריעה והסידור בליבה; הכתיבה המקומית כבר דורכת את הדחיפה.
+var LOOKUP_CFG = {
+  rows:   function (kind) { return lookupRows(kind); },
+  put:    function (row) { lookupPut(row); },
+  after:  function () { schedulePush(); },
+  render: function () { render(); }
+};
+
+// tables היא פונקציה ולא מערך — TABLES מוצהר אחרי הבלוק, וקריאה בו כאן הייתה מקבלת undefined.
+// טבלה שאינה נדחפת מוכרזת ב-noPush עם המסלול שדוחף אותה — רשומת אב או סוד.
+var MIRROR_CFG = {
+  prefix: self.APP.prefix + 'mirror_',
+  tables: function () { return TABLES.map(function (m) { return m.t; }); },
+  // ריק ומוצהר — שדה חסר נקרא «לא נשאל», וריק נקרא «נמדד ואין».
+  noPush: [],
+  empty:  function () { return []; },
+  clean:  function (t, rows) { return stripRows(t, rows); },
+  fail:   function (where, e) { console.error('[mirror] ' + where, e); },
+};
+
+var LS_CFG = {
+  // cachePrefix נגזר משם האפליקציה שבתצורה ולא מקידומת האחסון — שם אחסון שישתנה היה מחזיר רשימה ריקה, והבאנר היה חוזר בכל טעינה.
+  cachePrefix: self.APP.id + '-',
+  logKey: 'g_ls_log',
+  // הסימן נושא את תחילית האפליקציה — ה-origin משותף, וסימן אחד היה נדרס בכל דחייה.
+  dismissKey: 'g_sw_dismissed',
+  // מפתח שאינו במרשם נמחק בעלייה.
+  keys: function () {
+    return [LS_CFG.logKey, LS_CFG.dismissKey, DEV_CFG.key, PEND_CFG.key,
+            BK_CFG.flagKey, BK_CFG.logQueueKey]
+      .concat(eraKeys(), mirrorTables().map(mirrorKey));
+  }
+};
+
+// האפליקציה בפרויקט Supabase נפרד — ולכן sh_backup ו-sh_sync_log נוצרות בקובץ הסכימה שלה.
+var BK_CFG = {
+  client: function () { return S.sb; },
+  flagKey: 'g_last_backup',
+  logQueueKey: 'g_log_queue',
+  prefix: '',
+  device: function () { try { return getDeviceId(); } catch (e) { return null; } },
+  // המשתמש המחובר — שמו ביומן הגיבוי
+  user: function () { var u = gauthUser(); return u ? (u.full_name || u.login) : null; },
+  // secrets ריק — אין היום סוד, והמנגנון נשאר דרוך לסוד עתידי.
+  secrets: [],
+  sources: function () {
+    return [
+      { name: 'gr_donors',       order: 'client_id', ts: 'updated_at' },
+      { name: 'gr_pledges',      order: 'client_id', ts: 'updated_at' },
+      { name: 'gr_txns',         order: 'client_id', ts: 'updated_at' },
+      { name: 'gr_plan_items',   order: 'client_id', ts: 'updated_at' },
+      { name: 'gr_tasks',        order: 'client_id', ts: 'updated_at' },
+      { name: 'gr_targets',      order: 'client_id', ts: 'updated_at' },
+      { name: 'gr_shtar_people', order: 'client_id', ts: 'updated_at' },
+      { name: 'gr_shtar_calls',  order: 'client_id', ts: 'updated_at' },
+      { name: KV_TABLE,         order: 'key',       ts: 'updated_at' },
+      { name: 'gr_lookups',      order: 'client_id', ts: 'updated_at' },
+    ];
+  }
+};
+
+// אין כאן תור ולכן אין extra — הסימונים הם מקור האמת היחיד.
+var PEND_CFG = {
+  key: 'g_pending',
+  // סימון שקידומתו אינה כאן יורד בעלייה — אין לו כותב ואין שורה שתידחף ותוריד אותו.
+  marks: function () { return PUSH_TABLES.map(function (t) { return pendRowKey(t, ''); }); },
+  // בתום ההחזקה, תגית ממתין שנותרה צריכה להיכנס לשורות שכבר רונדרו — render שומר על מיקום הגלילה.
+  redraw: function () { try { render(); } catch (e) { } }
+};
+
+// הריקון הוא syncNow ואין פונקציית דחיפה נפרדת — דחיפה בלי משיכה שקדמה לה מחזירה לחיים שורה שנמחקה במכשיר אחר.
+var RTY_CFG = {
+  flush:   function () { return syncNow(); },
+  pending: function () { try { return pendCount() > 0; } catch (e) { return false; } },
+};
+
+// שורת החותמת מוחרגת מהמראה ב-stripRows — דחיפת-מצב שלה הייתה מחזירה לענן חותמת ישנה.
+// ok() אינו נוגע ב-_lastPullOk — הוא עד המשיכה המלאה, ושיחה מוצלחת אחרת אינה עדות על מצב הענן.
+var PL_CFG = {
+  every:  3000,
+  // הבדיקה המחזורית — כל עוד הלשונית גלויה ויש משתמש מחובר
+  active: function () { return document.visibilityState !== 'hidden' && !!gauthUser(); },
+  seen:   function () { return S._gSeenTs; },
+  note:   function (ts) { S._gSeenTs = ts; },
+  ok:     function () { S._lastSeenOk = Date.now(); },
+  pull:   function () { return syncNow(); },
+  client: function () { return S.sb; },
+  table:  function () { return KV_TABLE; },
+};
+
+// עמודות שירדו מהמסד — אין.
+var DROPPED_COLS = {};
+
+var PUSH_CFG = {
+  tables: PUSH_TABLES,
+  chunk:  500,
+  delay:  400,
+  rows:   function (t) { return MIRROR[t] || []; },
+  key:    function (t, row) { return rowPendingKey(t, row); },
+  send:   function (t, rows) {
+    var m = tableMeta(t), drop = DROPPED_COLS[t];
+    // עמודה שירדה מהמסד עדיין יושבת ברשומות שבמראה המקומית — נשמטת כאן, אחרת הדחיפה כולה נכשלת על «עמודה לא קיימת».
+    if (drop) rows = rows.map(function (r) { var o = Object.assign({}, r); drop.forEach(function (c) { delete o[c]; }); return o; });
+    return netTimeout(S.sb.from(t).upsert(rows, { onConflict: m.key }));
+  },
+  run:    function () { syncNow(); },
+};
+
+var ERA_CFG = {
+  prefix: self.APP.prefix,
+  client: function () { return S.sb; },
+  table:  function () { return KV_TABLE; },
+  refresh: function () { return syncNow(); },
+  log:    function (action, entries) { return logAwait(action, entries); }
+};
+
+// מזהה מכשיר אינו מזהה רשומה — אינו עובר ב-newClientId, ודי בשמונה תווים קריאים ביומן.
+// מזהה שכבר במכשיר אינו משתנה לעולם — החלפתו מנתקת רישומים קיימים ביומן ממקורם.
+var DEV_CFG = { key: 'g_device_id' };
+
+document.title = self.APP.name;
+
+// ── מעטפת המסך ──
+var VIEW_LOADING = '<div class="view-loading" role="status" aria-label="טוען"><span class="view-spin"></span></div>';
+
+// הכפתור הצף — הוספה במסך שיש בו מה להוסיף; בלוח הבקרה ובהגדרות אין.
+var FAB_ACT = { cards: 'donor-new', plan: 'plan-new', tasks: 'task-new', shtarot: 'sht-new' };
+
+var VIEWS = { dash: viewDash, cards: viewCards, plan: viewPlan, journal: viewJournal, tasks: viewTasks,
+              shtarot: viewShtarot, settings: viewSettings };
+
+function tabOf(id) {
+  var all = TABS.concat(MORE);
+  for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
+  return TABS[0];
+}
+
+function inMore(id) { return MORE.some(function (t) { return t.id === id; }); }
+
+// סמל רמת אביב שבראש המסך — נכס האייקון שהמחולל גוזר מ-design/icon-master.svg, ולא העתק שלו: מקור אחד, והמחולל מעדכן את ההפניה.
+var MARK_SRC = 'icons/icon-512.0556ed8b.png';
+
+function renderShell() {
+  // המשניים נצבעים גם הם, ומוצגים רק במסך רחב — שם «עוד» נעלם והסרגל פורס את כל המסכים.
+  var tabsHTML = TABS.concat(MORE).map(function (t) {
+    var cls = (state.screen === t.id ? 'on' : '') + (inMore(t.id) ? ' wide-only' : '');
+    return '<button data-act="tab" data-tab="' + t.id + '" class="' + cls.trim() + '">' +
+      '<span class="ic">' + icon(t.ic) + '</span><span>' + t.label + '</span></button>';
+  }).join('') +
+    '<button data-act="more" class="narrow-only' + (inMore(state.screen) ? ' on' : '') + '" aria-haspopup="dialog">' +
+      '<span class="ic">' + icon('more') + '</span><span>עוד</span></button>';
+  var t = tabOf(state.screen);
+
+  shellBare(false);
+  $('header.topbar').innerHTML =
+      '<div class="brand"><img class="brand-mark" src="' + MARK_SRC + '" alt="">' + '<span class="brand-t"><small>גיוס</small>' + esc(t.title || t.label) + '</span></div>' +
+      '<nav class="tabbar">' + tabsHTML + '</nav>';
+  var fab = $('#app > .fab'), act = FAB_ACT[state.screen];
+  if (!act) { if (fab) fab.remove(); return; }
+  if (!fab) { $('#app').insertAdjacentHTML('beforeend', '<button class="fab" aria-label="הוספה">' + icon('plus') + '</button>'); fab = $('#app > .fab'); }
+  fab.setAttribute('data-act', act);
+}
+
+function render() {
+  renderShell();
+  // שטרות — מסך שכבר מצויר מתעדכן בחלקיו: הרשימה ארוכה, והכרטיס הפתוח נושא שדות ומקום גלילה.
+  if (state.screen === 'shtarot' && S.lastViewKey === 'shtarot' && shtRefresh()) return;
+  // יומן — שדה שמקלידים בו אינו נדרס בציור שאחרי הסנכרון; הוא נשמר בעצמו בהפסקת ההקלדה
+  var ae = document.activeElement;
+  if (state.screen === 'journal' && S.lastViewKey === 'journal' && ae && ae.dataset && ae.dataset.inp === 'j-body') return;
+  $('#view').innerHTML = (VIEWS[state.screen] || viewDash)();
+  // קופצים לראש רק במעבר מסך — render נקראת גם מהבדיקה המחזורית, וגלילה ללא תנאי הייתה מקפיצה את המסך באמצע עבודה.
+  if (state.screen !== S.lastViewKey) { window.scrollTo(0, 0); S.lastViewKey = state.screen; }
+}
+
+// כניסה למסך — לוח הבקרה והתכנית בחודש של היום; הכרטיסים בלי סינון, לפי א״ב ובלי כרטיס פתוח.
+function go(screen) {
+  // איש שנשאר פתוח בשטרות — הנעילה שלו משתחררת ביציאה מהמסך.
+  if (state.sht.open) shtClose();
+  state.screen = screen;
+  var m = monthKeyOf(dayToday());
+  if (screen === 'dash') { state.month = m; state.dashPayAll = false; }
+  if (screen === 'plan') { state.planMonth = m; state.planOpen = {}; }
+  if (screen === 'cards') state.cards = { q: '', aff: '', pf: '', sort: 'sum', open: null, plOpen: null, tlOpen: false };
+  if (screen === 'shtarot') { state.sht.q = ''; state.sht.f = 'queue'; state.sht.lim = 0; state.sht.nav = []; }
+  if (screen === 'tasks') { state.tasks_ui.stage = null; state.tasks_ui.q = ''; }
+  if (screen === 'journal') { state.jDay = dayToday(); state.jArc = false; }
+  closeModal();
+  render();
+}
+
+// החיפוש מצייר את גוף המסך בלבד — ציור מלא היה מחליף את השדה ומפיל את המקלדת באמצע ההקלדה.
+function tasksRefresh() {
+  var box = $('#tasks-body');
+  if (box) box.innerHTML = tasksBodyHTML(); else render();
+}
+
+// בשטרות הרשימה ארוכה והכרטיס נושא שדות — הציור החלקי שומר על החיפוש, על הגלילה ועל מה שהוקלד.
+function shtListRefresh() {
+  var box = $('#sht-list');
+  if (box) box.innerHTML = shtListHTML(); else render();
+}
+
+function cardsRefresh() {
+  var box = $('#cards-list');
+  if (box) box.innerHTML = cardRowsHTML(); else render();
+}
+
+// ── גרירה ──
+// כל גרירה עוברת במנגנון שבליבה — הרשימות בהגדרות והפתקים; המחיל לכל סוג רשום ב-dragDef.
+document.addEventListener('pointerdown', function (e) { dragDown(e); });
+document.addEventListener('pointermove', function (e) { dragMove(e); });
+document.addEventListener('pointerup', function (e) { dragUp(e); });
+document.addEventListener('pointercancel', function (e) { dragCancel(e); });
+
+// ── פעולות ──
+// אין onclick עם קוד בתוך מאפיין — המסכים נבנים כמחרוזות, וגרש בשם תורם שובר את הקוד והופך הזרקה לביצוע.
+// saveRefresh אינה ממתינה לרשת — הכתיבה כבר במראה ובתור, והסנכרון מרנדר שוב ברקע.
+function saveRefresh() {
+  applyMirrorToState();
+  render();
+  pendRender();
+}
+
+function findIn(list, id) {
+  for (var i = 0; i < list.length; i++) if (idEq(list[i].client_id, id)) return list[i];
+  return null;
+}
+
+// מחיקה רכה אחרי אישור — ומחיקת אב מפילה איתה את הבנים (PC_CHILDREN).
+function delAsk(msg, table, id, done) {
+  return ask(MSG_DELETE_ACT, msg + MSG_DEL_SOFT, MSG_DELETE_ACT, null, null, true).then(function (yes) {
+    if (!yes) return;
+    return softDelete(table, id).then(function () { if (done) done(); return afterSave(MSG_DELETED); }).catch(errToast);
+  });
+}
+
+function saver(fn, msg) { return function (el) { return runSave(function () { return fn(el.dataset.id, el); }, msg); }; }
+
+var DOM_ACTIONS = {
+  'sw-apply':            function (el) { swApply(el); },
+  'sw-dismiss':          function () { swHideUpdate(); },
+  // התראות התשתית מנותבות במפה — הכפתור נבנה ב-JS, ומאזין ישיר עליו היה מחוץ למנגנון.
+  'ls-alert-close':      function () { var el = document.getElementById('ls-alert'); if (el) el.remove(); },
+  'pend-alert-ok':       function () { pendAlertDismiss(); },
+  'tab': function (el) { go(el.dataset.tab); },
+  'more': function () {
+    openModal(TTL_MORE, '<div class="more-tiles">' + MORE.map(function (t) {
+      return '<button data-act="tab" data-tab="' + t.id + '" class="' + (state.screen === t.id ? 'on' : '') + '">' +
+        '<span class="ic">' + icon(t.ic) + '</span><span>' + esc(t.label) + '</span></button>';
+    }).join('') + '</div>', '');
+  },
+  'modal-close': function () { modalDismiss(); },
+  'ask-yes': function () { closeAsk(true); },
+  'ask-no': function () { closeAsk(false); },
+
+  // ── לוח הבקרה ──
+  // הדשבורד מתחיל בחודש הראשון של האפליקציה — אין חודש לפניו.
+  'month': function (el) { var k = shiftMonth(state.month, +el.dataset.d); if (k < APP_FIRST_MONTH) return; state.month = k; state.dashPayAll = false; render(); },
+  'dash-pay-all': function () { state.dashPayAll = !state.dashPayAll; render(); },
+  'dash-who': function (el) { go('tasks'); state.tasks_ui.who = el.dataset.who; render(); },
+  'card-go': function (el) { go('cards'); state.cards.open = el.dataset.id; render(); },
+
+  // ── כרטיסים ──
+  'cards-sort': function (el) { state.cards.sort = el.dataset.v; render(); },
+  'card-toggle': function (el) {
+    state.cards.open = state.cards.open === el.dataset.id ? null : el.dataset.id;
+    state.cards.plOpen = null; state.cards.tlOpen = false;
+    cardsRefresh();
+  },
+  'pledge-toggle': function (el) {
+    state.cards.plOpen = state.cards.plOpen === el.dataset.id ? null : el.dataset.id;
+    cardsRefresh();
+  },
+  'card-close': function () { state.cards.open = null; cardsRefresh(); },
+  'card-share': function (el) { cardShare(el.dataset.id); },
+  'card-tl': function () { state.cards.tlOpen = !state.cards.tlOpen; cardsRefresh(); },
+  'card-star': function (el) {
+    var d = donorById(el.dataset.id);
+    if (!d) return;
+    return update('gr_donors', d.client_id, { starred: !d.starred }).then(function () { cardsRefresh(); }).catch(errToast);
+  },
+  'donor-new': function () { formDonor(null); },
+  'donor-edit': function (el) { formDonor(donorById(el.dataset.id)); },
+  'donor-save': saver(saveDonor, MSG_SAVED_OK),
+  'donor-del': function (el) {
+    return delAsk(MSG_DEL_DONOR, 'gr_donors', el.dataset.id, function () { state.cards.open = null; });
+  },
+  'pledge-new': function (el) { formPledge(null, el.dataset.donor); },
+  'pledge-edit': function (el) { formPledge(pledgeById(el.dataset.id)); },
+  'pledge-save': function (el) {
+    return runSave(function () { return savePledge(el.dataset.id, el.dataset.donor); }, 'ההתחייבות נשמרה');
+  },
+  'pledge-del': function (el) { return delAsk(MSG_DEL_PLEDGE, 'gr_pledges', el.dataset.id); },
+  'pay-new': function (el) { formPay(null, el.dataset.pledge, el.dataset.donor); },
+  'method-pick': function (el) { if (/^(sht|sc)-/.test(el.dataset.target)) return shtMethodPick(el); methodPick(el); },
+  'pay-edit': function (el) { var t = findIn(state.txns, el.dataset.id); if (t) formPay(t); },
+  'pay-save': function (el) {
+    return runSave(function () { return savePay(el.dataset.id, el.dataset.pledge); }, 'התשלום נשמר');
+  },
+  'pay-del': function (el) { return delAsk(MSG_DEL_PAY, 'gr_txns', el.dataset.id); },
+
+  // ── תכנית ──
+  'plan-share': function (el) { planShare(el.dataset.amb); },
+  'tasks-share': function () { tasksShare(); },
+  'plan-grp': function (el) { var a = el.dataset.amb; state.planOpen[a] = !state.planOpen[a]; render(); },
+  // גם התכנית אינה חוזרת לפני החודש הראשון של האפליקציה.
+  'plan-month': function (el) { var k = shiftMonth(state.planMonth, +el.dataset.d); if (k < APP_FIRST_MONTH) return; state.planMonth = k; render(); },
+  'plan-new': function () { formPlan(null); },
+  'plan-edit': function (el) { var r = findIn(state.plan, el.dataset.id); if (r) formPlan(r); },
+  'plan-save': saver(savePlan, MSG_SAVED_OK),
+  'plan-del': function (el) { return delAsk(MSG_DEL_PLAN, 'gr_plan_items', el.dataset.id); },
+  // ידני בלבד — השורה יורדת לתחתית ואינה נספרת בצפי ובבפועל.
+  'plan-irr': function (el) {
+    var r = findIn(state.plan, el.dataset.id);
+    if (!r) return;
+    return update('gr_plan_items', r.client_id, { irrelevant: !r.irrelevant }).then(function () { render(); }).catch(errToast);
+  },
+
+  // ── משימות ──
+  'task-who': function (el) { state.tasks_ui.who = el.dataset.who; render(); },
+  'task-stage': function (el) {
+    state.tasks_ui.stage = state.tasks_ui.stage === el.dataset.stage ? null : el.dataset.stage;
+    render();
+  },
+  'task-new': function () { formTask(null); },
+  'task-open': function (el) { var t = findIn(state.tasks, el.dataset.id); if (t) formTask(t); },
+  // העיגול שבשורת המשימה — בהרצה ⟵ הושלם, ומהושלם או מלא רלוונטי — חזרה להרצה.
+  'task-step': function (el) {
+    var t = findIn(state.tasks, el.dataset.id);
+    if (!t) return;
+    var next = t.stage === STAGES[0].id ? STAGES[1].id : STAGES[0].id;
+    return update('gr_tasks', t.client_id, { stage: next }).then(function () { render(); }).catch(errToast);
+  },
+  'task-star': function (el) {
+    var t = findIn(state.tasks, el.dataset.id);
+    if (!t) return;
+    return update('gr_tasks', t.client_id, { starred: !t.starred }).then(function () { render(); }).catch(errToast);
+  },
+  'task-save': saver(saveTask, MSG_TASK_SAVED),
+  'task-del': function (el) { return delAsk(MSG_DEL_TASK, 'gr_tasks', el.dataset.id); },
+
+  // ── יומן ──
+  'j-day': function (el) { state.jDay = el.dataset.day; state.jArc = false; render(); },
+  'j-arc': function () { state.jArc = !state.jArc; render(); },
+  'j-share': function () { return journalShare(state.jDay); },
+
+  // ── שטרות ──
+  'sht-filter': function (el) { state.sht.f = el.dataset.v; state.sht.lim = 0; render(); },
+  'sht-more': function () { state.sht.lim = (state.sht.lim || SHT_PAGE) + SHT_PAGE * 4; shtListRefresh(); },
+  'sht-open': function (el) { return shtOpen(el.dataset.id); },
+  'sht-step': function (el) { return shtStep(+el.dataset.d); },
+  'sht-close': function () { shtClose(); render(); },
+  'sht-st': function (el) { shtStatusPick(el); },
+  'sht-call-save': function () { return runSave(shtCallSave, MSG_CALL_SAVED); },
+  'sht-call-edit': function (el) { var c = callById(el.dataset.id); if (c) formCall(c); },
+  'sht-call-update': saver(saveCall, MSG_CALL_SAVED),
+  'sht-call-del': function (el) {
+    return delAsk(MSG_DEL_SHT_CALL, 'gr_shtar_calls', el.dataset.id, function () { if (state.sht.call === el.dataset.id) state.sht.call = null; });
+  },
+  'sht-next': function (el) { var c = callById(el.dataset.id); if (c) formNext(c); },
+  'sht-next-to': function (el) { shtNextTo(el); },
+  'sht-next-save': saver(saveNext, MSG_SHT_MOVED),
+  'sht-new': function () { formShtar(null); },
+  'sht-edit': function (el) { var p = personById(el.dataset.id); if (p) formShtar(p); },
+  'sht-save': saver(saveShtar, MSG_SAVED_OK),
+  'sht-del': function (el) { return delAsk(MSG_DEL_SHT, 'gr_shtar_people', el.dataset.id, function () { shtClose(); }); },
+
+  // ── הגדרות: הרשימות ──
+  // הזריעה קודמת לכל עריכה — רשימה שמוצגת מנקודת הפתיחה אינה נושאת שורות, ופריט אחד שנוסף היה מוחק את השאר.
+  'look-add': function (el) {
+    var l = listDef(el.dataset.k);
+    if (!l) { uiNoDialog('look-add', el.dataset.k); return; }
+    lookupSeed(l.kind, l.dflt);
+    lookupForm(l.kind, null);
+  },
+  'look-edit': function (el) {
+    var l = listDef(el.dataset.k);
+    if (l) lookupSeed(l.kind, l.dflt);
+    var r = lookupById(el.dataset.id);
+    if (!r) { uiNoDialog('look-edit', el.dataset.id); return; }
+    lookupForm(r.kind, r);
+  },
+  'look-save': function (el) {
+    var inp = $('#l-label');
+    if (!inp) { uiNoDialog('look-save', 'l-label'); return; }
+    var txt = inp.value.trim(), id = el.dataset.id, kind = el.dataset.k;
+    if (!txt) { toast(MSG_NEED_VALUE, null, 'warn'); return; }
+    // השורה שנערכת מוחרגת מהבדיקה — אחרת היא מתנגשת בעצמה.
+    var others = lookupRows(kind).filter(function (x) { return !idEq(x.client_id, id); })
+      .map(function (x) { return x.label; });
+    if (uniqHas(others, txt)) { toast(MSG_VALUE_EXISTS, null, 'warn'); return; }
+    return runSave(function () {
+      var r = id ? lookupById(id) : null;
+      var row = r ? Object.assign({}, r, { label: txt, updated_at: Date.now() })
+                  : { client_id: newClientId(), kind: kind, label: txt,
+                      sort: lookupRows(kind).length + 1, deleted: false, deleted_at: null };
+      lookupPut(row);
+      return row;
+    }, MSG_SAVED_OK);
+  },
+  'look-del': function (el) {
+    var r = lookupById(el.dataset.id);
+    if (!r) { uiNoDialog('look-del', el.dataset.id); return; }
+    return ask(MSG_DELETE_ACT, MSG_DEL_LOOKUP, MSG_DELETE_ACT, null, null, true).then(function (yes) {
+      if (!yes) return;
+      // המחיקה סימון וחותמת על אותה שורה — tombKill חותם את deleted_at ברגע ה-updated_at שלה.
+      lookupPut(tombKill(Object.assign({}, r)));
+      return afterSave(MSG_REMOVED);
+    });
+  },
+
+  // ── הגדרות: יעד ──
+  'target-set': function (el) { formTarget(el.dataset.month || state.month); },
+  'target-save': function () { return runSave(saveTarget, MSG_GOAL_SAVED); },
+  'target-clear': function (el) {
+    return softDelete('gr_targets', el.dataset.id).then(function () { return afterSave(MSG_GOAL_RESET); }).catch(errToast);
+  },
+  'target-default': function () { formTargetDefault(false); },
+  'target-year': function () { formTargetDefault(true); },
+  'target-default-save': function (el) { return runSave(function () { return saveTargetDefault(!!el.dataset.year); }, MSG_GOAL_DEFAULT_SAVED); },
+  'reload':            function () { location.reload(); },
+  'combo-pick':        function (el) { return comboPick(el); },
+  'combo-make':        function (el) { return comboMake(el); },
+  'combo-more':        function (el) { return comboMore(el); },
+  'donor-new-cancel':  function (el) { donorNewCancel(el.dataset.id); },
+  'donor-new-save':    function (el) { return donorNewSave(el.dataset.id); },
+};
+
+// ── מאזינים גלובליים ──
+Object.assign(DOM_ACTIONS, GAUTH_ACTIONS);
+actWire(DOM_ACTIONS);
+
+// החיפוש מרנדר רק את הרשימה — רינדור מלא בונה מחדש את השדה ומאבד את הפוקוס אחרי כל תו.
+document.addEventListener('input', function (e) {
+  if (comboInput(e)) return;
+  var el = e.target;
+  if (!el.dataset) return;
+  if (el.dataset.inp === 'cards-q') { state.cards.q = el.value; cardsRefresh(); }
+  if (el.dataset.inp === 'tasks-q') { state.tasks_ui.q = el.value; tasksRefresh(); }
+  if (el.dataset.inp === 'j-body') { journalBody(el); return; }
+  if (el.dataset.inp === 'sht-q') { state.sht.q = el.value; state.sht.lim = 0; shtListRefresh(); }
+  if (el.dataset.inp === 'pay-so') soSync();
+  if (el.dataset.inp === 'p-so' || el.id === 'p-amount') pSoSync();
+});
+
+document.addEventListener('change', function (e) {
+  var el = e.target;
+  if (!el.dataset) return;
+  if (el.dataset.chg === 'cards-aff') { state.cards.aff = el.value; cardsRefresh(); return; }
+  if (el.dataset.chg === 'sc-status') { callStatusPick(el.value); return; }
+  if (el.dataset.chg === 'sht-res') { state.sht.f = el.value || 'queue'; state.sht.lim = 0; render(); return; }
+  if (el.dataset.chg === 'cards-pf') { state.cards.pf = el.value; cardsRefresh(); return; }
+  if (el.dataset.chg === 'p-now') { var nb = $('#p-now-box'); if (nb) nb.hidden = !el.checked; return; }
+  // תאריך שנבחר מעביר את החודש אחריו — שני שדות שסותרים זה את זה היו נשמרים בשקט.
+  if (el.dataset.chg === 'so-uneq') { soUneqToggle(el.dataset.px); return; }
+  if (el.dataset.chg === 'when-date') {
+    var mInp = document.getElementById(el.dataset.m);
+    if (mInp && el.value) mInp.value = monthKeyOf(el.value);
+    return;
+  }
+  // שייכות — בטופס הכרטיס; נשמרת עם השמירה.
+  if (el.dataset.chg === 'aff-pick') { var ch = el.closest('.chip'); if (ch) ch.classList.toggle('on', el.checked); return; }
+  if (el.dataset.chg === 'pay-pledge') { payPledgePick(el); return; }
+});
+
+// focusin ולא focus — focus אינו עולה בעץ, ומאזין על השדה עצמו מת עם חלון הדו-שיח שנבנה מחדש.
+document.addEventListener('focusin', comboFocus);
+
+// ── עלייה ──
+// אין להזיז את mirrorLoad אחרי הסנכרון הראשון — המסך עולה מהדיסק לפני שנוגעים ברשת.
+function boot() {
+  viewBare(VIEW_LOADING);
+  // קריאה מהעותק המקומי לפני כל נגיעה ברשת — זה ההבדל בין עבודה אופליין לספינר.
+  applyMirrorToState();
+  pendRender();
+
+  if (mirrorHasData()) {
+    render();
+    syncNow();
+    return Promise.resolve();
+  }
+
+  // אין עותק מקומי כלל — כאן רשת היא חובה.
+  return syncNow().then(function (okPull) {
+    if (okPull || mirrorHasData()) { render(); return; }
+    viewBare('<div class="load-err"><div class="load-err-card">' +
+      '<h1>שגיאת טעינה</h1><div class="sub">אין עדיין עותק מקומי של הנתונים, ולא הצלחנו לטעון מהשרת. ' +
+      'התחברו לרשת פעם אחת — מכאן והלאה האפליקציה תעבוד גם בלעדיה.</div>' +
+      '<button class="reload-btn btn block" data-act="reload">רענון</button>' +
+      '</div></div>');
+  });
+}
+
+function start() {
+  shell.render = render;
+  state.month = state.planMonth = monthKeyOf(dayToday());
+  if (!window.supabase || !window.supabase.createClient) {
+    viewBare('<div class="load-err"><div class="load-err-card"><h1>שגיאת טעינה</h1>' +
+      '<div class="sub">ספריית Supabase לא נטענה. בדקו את החיבור לאינטרנט ורעננו.</div>' +
+      '<button class="btn block" data-act="reload">רענון</button></div></div>');
+    return;
+  }
+  // הלקוח — עם הסשן של האפליקציה (core/gauth.js): המסד פתוח רק למשתמש מהרשימה, מחובר
+  S.sb = sbWatch(window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, gauthClientOpts()));
+  return true;
+}
+function startData() {
+  // הליבה עולה לפני המסך — הסימונים, הגיבוי והמראה, והמסך עולה מהדיסק לפני שנוגעים ברשת.
+  bootRun();
+  boot();
+}
+
+// האחסון נפתח לפני כל קריאה ממנו — אחרי שה-CFG הוגדרו, כי המרשם קורא אותם.
+await lsOpen();
+if (start()) {
+  window.bootOk();
+  // הכניסה — מסך הכניסה מעל הכל, עד שנכנס משתמש מהרשימה; והנתונים רק אחריה
+  await gauthGate();
+  startData();
+} else window.bootOk();
