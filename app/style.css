@@ -814,12 +814,23 @@ main #sht-give > .card{margin-bottom:var(--sp-6)}
 .dx-d{flex:none;color:var(--text-2);font-size:var(--fs-2)}
 .dx-add{border:1px dashed var(--border);border-radius:var(--r-4);padding:var(--sp-4)}
 /* ── עמידה ביעד (הדשבורד) ── */
-.yr-comply{display:flex;align-items:center;gap:var(--sp-4);margin-top:var(--sp-6);padding:var(--sp-4) var(--sp-5);border-radius:var(--r-4);background:var(--slate-soft);color:var(--text-2);font-size:var(--fs-2)}
-.yr-comply .ico{flex:none;width:20px;height:20px}
-.yr-comply b{color:var(--text)}
-.yr-comply.ok{background:var(--ok-soft)} .yr-comply.ok .ico,.yr-comply.ok b{color:var(--ok)}
-.yr-comply.bad{background:var(--bad-soft)} .yr-comply.bad .ico,.yr-comply.bad b{color:var(--bad)}
-.yr-comply.none{justify-content:center}
+.yr-comply{margin-top:var(--sp-6);padding:var(--sp-5) var(--sp-6);border-radius:var(--r-5,18px);background:var(--slate-soft);display:flex;flex-direction:column;gap:var(--sp-4)}
+.yc-hd{display:flex;align-items:center;gap:var(--sp-3)}
+.yc-hd b{font-size:var(--fs-3);color:var(--text)}
+.yc-ic{flex:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--card);color:var(--brand-ink)}
+.yc-ic .ico{width:18px;height:18px}
+.yc-chip{margin-inline-start:auto;font-size:.8rem;font-weight:700;border-radius:999px;padding:4px 12px;background:var(--card)}
+.yc-chip.ok,.yc-n b.ok{color:var(--ok)} .yc-chip.bad,.yc-n b.bad{color:var(--bad)}
+.yc-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-3);background:var(--card);border-radius:var(--r-4,14px);padding:var(--sp-4) var(--sp-3)}
+.yc-n{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;min-width:0}
+.yc-n+.yc-n{border-inline-start:1px solid var(--border)}
+.yc-n small{font-size:.78rem;color:var(--text-2)}
+.yc-n b{font-size:var(--fs-4);font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.yc-bar{height:8px;border-radius:999px;background:var(--card);overflow:hidden}
+.yc-bar i{display:block;height:100%;border-radius:999px}
+.yc-bar i.ok{background:var(--ok)} .yc-bar i.bad{background:var(--bad)}
+.yc-note{font-size:.8rem;color:var(--text-2)}
+.yr-comply.none .yc-note{margin-top:-4px}
 /* ── הצעת גיוס לפי הקטגוריות (התכנית) ── */
 .sg h2{display:flex;align-items:baseline;gap:var(--sp-4)}
 .sg-tot{margin-inline-start:auto;font-size:var(--fs-2);font-weight:700;color:var(--slate);font-variant-numeric:tabular-nums}
