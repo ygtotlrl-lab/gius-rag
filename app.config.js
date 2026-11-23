@@ -40,7 +40,7 @@ self.APP = Object.freeze({
     share: { chooser: 'שיתוף הקובץ', print: true }
   },
   // sign-apk.sh מסרב לחתום בכל מפתח אחר
-  signSha256: '30:C3:08:38:6B:2E:19:F6:B2:0C:FF:AE:57:4A:3C:9A:DF:13:63:8C:B6:A6:8F:80:E4:8E:88:9F:1D:00:A9:7A',
+  signSha256: '39:D5:CA:F8:FE:2F:B3:9F:68:13:77:ED:22:78:3E:07:F5:2F:65:03:23:F5:1A:66:FC:6F:B7:89:6F:33:B4:58',
   icon: {
     // svg הוא מאסטר גיאומטרי שנקרא ונצבע, ו-master רסטרי הוא ציור שהוקטן — ותואם את סיומת המאסטר.
     art: 'svg',

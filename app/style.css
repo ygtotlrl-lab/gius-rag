@@ -12,10 +12,10 @@
 
   /* «כחול הספר»: מצבעי הסמל של בית חב״ד רמת אביב ג׳ — כחול הספר לזהות, אפור-כחלחל של הבתים למשני,
      זהב לנדיבות ולהישג (כמו בגיוס), רקע כחלחל בהיר וכרטיסים לבנים. */
-  --bg:#f3f5fa; --card:#ffffff; --card-2:#f5f7fb;
-  --text:#1b2440; --text-2:#4a5470; --text-3:#6b7590;
-  --border:#dde3ef; --border-2:#e8ecf4;
-  --brand-ink:#0a4687; --brand-fill:#0b55a6; --brand-soft:#e1e9f5; --slate:#7a82a0;
+  --bg:#f1f1f7; --card:#ffffff; --card-2:#f5f5fa;
+  --text:#1b2440; --text-2:#4a5470; --text-3:#6e7593;
+  --border:#dedfeb; --border-2:#e9e9f2;
+  --brand-ink:#0a4687; --brand-fill:#0b55a6; --brand-soft:#e5e6f2; --slate:#7a82a0; --slate-soft:#ebecf4;
   --accent-2:#d9a13b; --accent-2-soft:#fbf0da;
   --ok:#2f7a4b; --ok-soft:#e3f1e8;
   --warn:#8a5a0b; --warn-soft:#fbf0da;
@@ -35,10 +35,10 @@
     :root{
       --on-brand:#ffffff;
 
-      --bg:#10151f; --card:#171e2b; --card-2:#1d2535;
+      --bg:#12131d; --card:#1a1b28; --card-2:#202232;
       --text:#e8edf5; --text-2:#c2cbd9; --text-3:#97a2b4;
-      --border:#283247; --border-2:#202a3c;
-      --brand-ink:#9cc0f0; --brand-fill:#2f6fc0; --brand-soft:#1a2740; --slate:#a3aac4;
+      --border:#2c2e44; --border-2:#232538;
+      --brand-ink:#9cc0f0; --brand-fill:#2f6fc0; --brand-soft:#252842; --slate:#a3aac4; --slate-soft:#25273a;
       --accent-2:#e3b04b; --accent-2-soft:#3a2e14;
       --ok:#8fd0a5; --ok-soft:#18291f;
       --warn:#e8b25c; --warn-soft:#352a17;
@@ -85,7 +85,7 @@ tfoot td{font-weight:700;border-top:1px solid var(--border);border-bottom:0;back
 .brand{display:flex;align-items:center;gap:var(--sp-4);font-weight:800;font-size:var(--fs-4);letter-spacing:var(--ls-n1)}
 .brand .brand-mark{width:26px;height:26px;flex:none}
 .brand-t{display:flex;flex-direction:column;line-height:var(--lh-2)}
-.brand-t small{font-weight:600;color:var(--text-3);font-size:var(--fs-1)}
+.brand-t small{font-weight:600;color:var(--slate);font-size:var(--fs-1)}
 /* רוחב קבוע לשם המסך — שם ארוך או קצר אינו מזיז את סרגל הניווט שלצדו. */
 .brand-t{width:9.5em;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tabbar .wide-only{display:none}
@@ -105,7 +105,7 @@ tfoot td{font-weight:700;border-top:1px solid var(--border);border-bottom:0;back
 .tabbar button .ic .ico{width:24px;height:24px}
 .ic .ico{display:block;width:100%;height:100%}
 /* הלשונית הפעילה — האייקון בגלולה רכה ברך הזהות, והאייקון והתווית בדיו הזהות */
-.tabbar button.on{color:var(--brand-ink);font-weight:700}
+.tabbar button.on{color:var(--brand-ink)}
 .tabbar button.on .ic{background:var(--brand-soft)}
 /* מסך שלפני העלייה ממלא את החלון כולו — בלי ריפוד המיכל. */
 .app.is-bare > main{padding:0;max-width:none}
@@ -301,7 +301,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
   .g-list > div:nth-last-child(-n+2){border-bottom:0}
 }
 /* אייקון בעיגול רך, והתווית הקטנה מעל הערך */
-.g-ic{flex:none;width:36px;height:36px;border-radius:50%;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center}
+.g-ic{flex:none;width:36px;height:36px;border-radius:50%;background:var(--slate-soft);color:var(--slate);display:grid;place-items:center}
 .g-ic .ico{width:18px;height:18px}
 .g-txt{display:flex;flex-direction:column;min-width:0}
 .g-list dt,.g-list dd{margin:0}
@@ -348,7 +348,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .brk-row{grid-column:1/-1;display:grid;grid-template-columns:subgrid;align-items:center}
 .brk-lab{display:flex;align-items:center;gap:var(--sp-3);min-width:0}
 .brk-lab b{font-size:var(--fs-3);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.brk-ic{width:28px;height:28px;border-radius:50%;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;flex:none}
+.brk-ic{width:28px;height:28px;border-radius:50%;background:var(--slate-soft);color:var(--slate);display:grid;place-items:center;flex:none}
 .brk-ic svg{width:15px;height:15px;display:block}
 .brk-val{font-size:var(--fs-3);font-weight:800;color:var(--brand-ink);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:end}
 .brk-pct{font-size:var(--fs-1);font-weight:700;border-radius:var(--r-6);padding:1px var(--sp-3);font-variant-numeric:tabular-nums;background:var(--brand-soft);color:var(--brand-ink);justify-self:start;min-width:36px;text-align:center}

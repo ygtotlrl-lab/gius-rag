@@ -43,7 +43,7 @@ var LISTS = [
 var ASSIGNEES = ['הרב ליפש', 'שמוליק מישולובין'];
 
 var STAGES = [
-  { id: 'בהרצה', cls: 'run' },
+  { id: 'בעבודה', cls: 'run' },
   { id: 'הושלם', cls: 'done' },
   { id: 'לא רלוונטי', cls: 'off' }
 ];
