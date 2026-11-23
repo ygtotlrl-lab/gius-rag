@@ -58,7 +58,7 @@ function viewJournal() {
     var r = jnRow(day, sec), body = r ? r.body || '' : '';
     return '<div class="jn-win' + (sec === JN_GENERAL ? ' gen' : '') + (body.trim() ? ' has' : '') + '">' +
       '<h3>' + icon(sec === JN_GENERAL ? 'tasks' : 'tag') + esc(sec) + '</h3>' +
-      '<textarea data-inp="j-body" data-day="' + esc(day) + '" data-sec="' + esc(sec) + '" placeholder="מה פעלו היום…" aria-label="' + esc(sec) + '">' +
+      '<textarea data-inp="j-body" data-day="' + esc(day) + '" data-sec="' + esc(sec) + '" placeholder="טקסט חופשי…" aria-label="' + esc(sec) + '">' +
         esc(body) + '</textarea></div>';
   }).join('') + '</div>';
   return h;
