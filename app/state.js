@@ -26,10 +26,7 @@ var state = {
   planOpen: {},
   donors: [], pledges: [], txns: [], plan: [], tasks: [], targets: [],
   journal: [],
-  shtarPeople: [], shtarCalls: [],
-  // שטרות — החיפוש, הסינון, האיש הפתוח, השיחה שנרשמה בפתיחה הזו, סדר «הקודם/הבא» ומספר השורות המוצגות;
-  // amb — השגריר המטלפן, נשאר בין איש לאיש.
-  sht: { q: '', f: 'queue', open: null, call: null, nav: [], lim: 0, amb: '' },
+  notes: [],
   // כרטיסים ותשלומים — בכל כניסה למסך: בלי סינון, ממוין לפי א״ב, ובלי כרטיס פתוח.
   cards: { q: '', aff: '', pf: '', sort: 'sum', open: null, plOpen: null, tlOpen: false },
   // יומן העבודה — היום המוצג (ISO), והארכיון פתוח או סגור.

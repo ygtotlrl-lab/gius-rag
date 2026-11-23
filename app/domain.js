@@ -69,6 +69,8 @@ function initials(name) {
 }
 
 // ── המיונים — פונקציה אחת לכל סוג רשומות ──
+function gSortNotes(list) { return list.slice().sort(bySort); }
+
 function bySort(a, b) {
   return ((+a.sort || 0) - (+b.sort || 0)) || sortCompare(String(a.created_at || ''), String(b.created_at || ''));
 }
@@ -242,8 +244,7 @@ function applyMirrorToState() {
   state.tasks   = liveRows('gr_tasks');
   state.targets = liveRows('gr_targets');
   state.journal = liveRows('gr_journal');
-  state.shtarPeople = liveRows('gr_shtar_people');
-  state.shtarCalls  = liveRows('gr_shtar_calls');
+  state.notes   = liveRows('gr_notes');
 }
 
 // ── כתיבה מקומית ──
@@ -298,8 +299,7 @@ function update(table, id, patch) {
 var PC_CHILDREN = {
   gr_donors: [{ t: 'gr_pledges', fk: 'donor_client_id' }, { t: 'gr_txns', fk: 'donor_client_id' },
              { t: 'gr_plan_items', fk: 'donor_client_id' }],
-  gr_pledges: [{ t: 'gr_txns', fk: 'pledge_client_id' }],
-  gr_shtar_people: [{ t: 'gr_shtar_calls', fk: 'person_client_id' }]
+  gr_pledges: [{ t: 'gr_txns', fk: 'pledge_client_id' }]
 };
 
 // הכתיבה לבנים עוברת ב-upsertLocal ולא ב-update — update חותם Date.now() ומבטל את ירושת החותמת.
@@ -501,19 +501,37 @@ function donorPaid(id) { return sum(txnsOfDonor(id), function (t) { return t.amo
 function donorLeft(id) { return sum(pledgesOfDonor(id), function (p) { return leftForPledge(p); }); }
 
 // החודש של תשלום — שדה משלו ולא נגזר מהתאריך: תשלום בלי תאריך עדיין שייך לחודש שבו נרשם.
-function monthTxns(m) { return state.txns.filter(function (t) { return t.txn_month === m; }); }
+// הו״ק — גם החודשים שאחרי החודש שבו נרשם, עד סוף השנה הלועזית: כל פעימה נספרת בחודש שלה.
+function monthTxns(m) {
+  return state.txns.filter(function (t) {
+    if (t.txn_month === m) return true;
+    var n = +t.installments || 0, i = soIndex(t, m);
+    return n > 1 && i >= 1 && i < n;
+  });
+}
+// מספר הפעימה של תשלום הו״ק בחודש m — 0 בחודש שבו נרשם; −1 בשנה לועזית אחרת או לפניו
+function soIndex(t, m) {
+  if (!t.txn_month || !m || t.txn_month.slice(0, 4) !== m.slice(0, 4)) return -1;
+  var i = +m.slice(5, 7) - +t.txn_month.slice(5, 7);
+  return i >= 0 ? i : -1;
+}
 
 // כל תשלום נספר בדשבורד וביעד, מלבד מה שסומן «תשלום לא יזום» (`not_initiated`); הכרטיס מציג הכל.
 function isInitiated(t) { return !t.not_initiated; }
 
 function monthTxnsInit(m) { return monthTxns(m).filter(isInitiated); }
 
-// הו״ק — התשלום כולו נזקף להתחייבות, ולחודש שלו נזקפת הפעימה הראשונה בלבד: מה שנכנס בו בפועל.
-// פעימות שאינן שוות — הראשונה נשמרת (`first_installment`) וגוברת על החלוקה השווה.
-function monthAmount(t) {
+// הו״ק — התשלום כולו נזקף להתחייבות, ולכל חודש נזקפת הפעימה שלו, עד סוף השנה הלועזית שבה נרשם.
+// פעימות שאינן שוות — הראשונה נשמרת (`first_installment`) וגוברת על החלוקה השווה, והשאר מתחלק שווה.
+// בלי חודש — הפעימה הראשונה (בכרטיס ובציר התשלומים).
+function monthAmount(t, m) {
   var n = +t.installments || 0;
-  if (n > 1 && +t.first_installment > 0) return num(t.first_installment);
-  return n > 1 ? Math.round(num(t.amount) / n * 100) / 100 : num(t.amount);
+  if (!(n > 1)) return num(t.amount);
+  var first = +t.first_installment > 0 ? num(t.first_installment) : Math.round(num(t.amount) / n * 100) / 100;
+  if (!m || m === t.txn_month) return first;
+  var i = soIndex(t, m);
+  if (i < 1 || i >= n) return 0;
+  return Math.round((num(t.amount) - first) / (n - 1) * 100) / 100;
 }
 
 // פירוט הו״ק לתצוגה — הפעימות והסכום לפעימה; בפעימות שאינן שוות — הפעימות והראשונה; ריק לתשלום רגיל.
@@ -553,8 +571,8 @@ function targetYear() {
 
 // «בפועל» בשורת תכנית — התשלומים של הכרטיס בחודש התכנית; נגזר ואינו מוקלד.
 function planActual(it) {
-  return sum(txnsOfDonor(it.donor_client_id).filter(function (t) { return t.txn_month === it.plan_month; }),
-             monthAmount);
+  return sum(monthTxns(it.plan_month).filter(function (t) { return t.donor_client_id === it.donor_client_id; }),
+             function (t) { return monthAmount(t, it.plan_month); });
 }
 
 function planOfMonth(m) { return state.plan.filter(function (r) { return r.plan_month === m; }); }
@@ -684,7 +702,7 @@ function donorMatches(q, aff, mode, pf) {
 export { donorNextDate, $, applyMirrorToState, checked, collectedForPledge, datalistHTML, dmyDate, donorById,
          donorFieldHTML, donorLeft, donorMatches, donorName, donorNewCancel, donorNewSave, donorPaid,
          donorTotal, emptyBox, gSortDonors, gSortGroups, gSortPlan, planGroup, gSortPledges,
-         gSortTasks, gSortTxns, ils, initials, insert, leftForPledge, listDef, lookupById, lookupLabels,
+         gSortNotes, gSortTasks, gSortTxns, ils, initials, insert, leftForPledge, listDef, lookupById, lookupLabels,
          lookupPut, lookupRows, mirrorHasData, monthAmount, monthKeyOf, monthLabel, monthTxns, monthTxnsInit, nextSort, nullable,
          nowISO, num, ok, pendRowKey, planActual, planOfMonth, pledgeById, pledgeStatus, pledgesOfDonor,
          rowPendingKey, selectHTML, shiftMonth, softDelete, statusClass, stripRows, sum, syncNow,

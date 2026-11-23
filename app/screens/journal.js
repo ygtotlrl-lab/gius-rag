@@ -48,19 +48,21 @@ function viewJournal() {
       '<b>' + esc(jnDayTitle(day)) + '<small>' + esc(dmyDate(day) + (day === today ? ' · היום' : '')) + '</small></b>' +
       '<button class="btn ghost sm ic" data-act="j-day" data-day="' + esc(dayAdd(day, 1)) + '" aria-label="היום הבא"' + (day >= today ? ' disabled' : '') + '>' + icon('next') + '</button>' +
     '</div>' +
+    // שיתוף וארכיון — כפתורים קטנים ועדינים מתחת לתאריך, ולא שני כפתורים גדולים
     '<div class="jn-acts">' +
-      '<button class="btn" data-act="j-share">' + icon('share') + 'שיתוף כרטיס היום</button>' +
-      '<button class="btn ghost" data-act="j-arc" aria-expanded="' + !!state.jArc + '">' + icon('calendar') + 'ארכיון הימים</button>' +
+      '<button class="jn-act" data-act="j-share">' + icon('share') + 'שיתוף היום</button>' +
+      '<button class="jn-act' + (state.jArc ? ' on' : '') + '" data-act="j-arc" aria-expanded="' + !!state.jArc + '">' + icon('calendar') + 'ארכיון הימים</button>' +
     '</div>' +
   '</section>';
   if (state.jArc) return h + '<section class="card"><h2>ארכיון הימים</h2>' + jnArchiveHTML() + '</section>';
-  h += '<div class="jn-grid">' + jnWindows().map(function (sec) {
+  // רכיב אחד ארוך — לכל קטגוריה כותרת ושדה טקסט, בקו דק ביניהן, ולא חלון נפרד לכל אחת
+  h += '<section class="card jn-book">' + jnWindows().map(function (sec) {
     var r = jnRow(day, sec), body = r ? r.body || '' : '';
     return '<div class="jn-win' + (sec === JN_GENERAL ? ' gen' : '') + (body.trim() ? ' has' : '') + '">' +
       '<h3>' + icon(sec === JN_GENERAL ? 'tasks' : 'tag') + esc(sec) + '</h3>' +
       '<textarea data-inp="j-body" data-day="' + esc(day) + '" data-sec="' + esc(sec) + '" placeholder="טקסט חופשי…" aria-label="' + esc(sec) + '">' +
         esc(body) + '</textarea></div>';
-  }).join('') + '</div>';
+  }).join('') + '</section>';
   return h;
 }
 

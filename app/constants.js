@@ -40,10 +40,10 @@ var LISTS = [
 
 // ── המשימות ──
 // שלושת האחראים קבועים — אין להם רשימה בהגדרות.
-var ASSIGNEES = ['הרב ליפש', 'שמוליק מישולובין'];
+var ASSIGNEES = ['הרב ליפש', 'הרב מישולובין'];
 
 // הצעת הגיוס החודשית לכל קטגוריה — מה שמכוונים לגייס בחודש, בתחתית התכנית
-var CAT_SUGGEST = [['גבירים', 2000], ['הו״ק', 500], ['הקדשת התוועדויות שבת', 500], ['עליות לתורה', 1500],
+var CAT_SUGGEST = [['גבירים', 10000], ['הו״ק', 500], ['הקדשת התוועדויות שבת', 2000], ['עליות לתורה', 1500],
   ['מגביות', 2000], ['דינר/קמפיין', 2000], ['מרכז החסד', 1000], ['תקציבים ועירייה', 1000]];
 
 var STAGES = [
@@ -58,31 +58,9 @@ var PLAN_KINDS = ['גבייה', 'התרמה'];
 // ── ההלוואות ──
 // בסדר הטיפול — מה שמחכה לפעולה ראשון, ומה שנמסר בסוף; זה גם סדר המיון לפי סטטוס.
 
-// ── השטרות ──
-// «תרם» ו«התחייב» — שתי תוצאות נפרדות, ושתיהן נושאות סכום ואמצעי (SHT_GIVE, הסכום רשות).
-// «נסלק» אינה תוצאה ואינה שיחה: בדיקה שהכסף של «תרם» נסלק — הסימון «טופל» על שיחת «תרם», מ«ממתינים לטיפול»; ובבורר «לפי תוצאה» — מעל «תרם».
-// תוצאת השיחה: fin — האיש יצא מהתור; בלי fin — «לא ענה» חוזר לתור אחרי SHT_RETRY_MS, ו«לחזור אליו» במועד שנקבע.
-var SHT_STATUS = {
-  na:    { l: 'לא ענה', cls: '' },
-  wrong: { l: 'מספר שגוי', cls: '', fin: true },
-  yes:   { l: 'תרם', cls: 'ok', fin: true },
-  pl:    { l: 'התחייב', cls: 'gold', fin: true },
-  int:   { l: 'ממתין לפרטים', cls: 'brand', fin: true },
-  cb:    { l: 'לחזור אליו', cls: 'warn' },
-  no:    { l: 'לא מעוניין', cls: '', fin: true },
-  rmv:   { l: 'להסיר מהרשימה', cls: 'bad', fin: true }
-};
-var SHT_GIVE = ['yes', 'pl'];
-// «ממתינים לטיפול» — המצב · הכפתור · המצבים שהלחיצה מעבירה אליהם: מעבר — שיחה חדשה ביום הלחיצה, והקודמת מסומנת «טופל»;
-// ו«נסלק» (בלי מצב הבא) — רק הסימון «טופל» על שיחת «תרם», בלי שיחה חדשה.
-var SHT_NEXT = [['int', 'טופל', ['pl', 'yes']], ['pl', 'תרם', ['yes']], ['yes', 'נסלק', []]];
-var SHT_RETRY_MS = 2 * 60 * 60 * 1000;
-// נעילה בלי סימן חיים — משתחררת מעצמה; סימן החיים כל דקה.
-var SHT_LOCK_MS = 15 * 60 * 1000;
-var SHT_BEAT_MS = 60 * 1000;
-var SHT_PAGE = 60;
+// ── הפתקים — צבעי הרקע ──
+var NOTE_COLORS = ['sand', 'terra', 'sage', 'sky', 'rose', 'plum'];
 
-// ── הרשומות — צבעי הרקע ──
 
 // ── הניווט ──
 // ארבעה ראשיים ו«עוד» — והמשניים בלוח שנפתח מלמטה. ic — שם אייקון מהסט שב-app/icons.js.
@@ -95,7 +73,7 @@ var TABS = [
 
 var MORE = [
   { id: 'tasks', ic: 'tasks', label: 'משימות' },
-  { id: 'shtarot', ic: 'shtarot', label: 'הו״ק' },
+  { id: 'notes', ic: 'notes', label: 'פתקים' },
   { id: 'settings', ic: 'settings', label: 'הגדרות' }
 ];
 
@@ -119,6 +97,7 @@ var MSG_VALUE_EXISTS = 'הערך כבר קיים ברשימה';
 var MSG_PICK_DONOR = 'נא לבחור כרטיס';
 var MSG_PICK_TYPE = 'נא לבחור סוג';
 var MSG_PICK_AMB = 'נא לבחור שגריר';
+var MSG_PICK_SEC = 'נא לבחור קטגוריה';
 var MSG_PLEDGE_NO_AMB = 'להתחייבות אין שגריר — יש לבחור אותו בעריכת ההתחייבות';
 var MSG_AMOUNT_POSITIVE = 'נא להזין סכום גדול מאפס';
 var MSG_SO_COUNT = 'מספר הפעימות — 2 לפחות';
@@ -138,16 +117,8 @@ var MSG_DEL_PLEDGE = 'למחוק את ההתחייבות? התשלומים של�
 var MSG_DEL_PAY = 'למחוק את התשלום?';
 var MSG_DEL_PLAN = 'למחוק את השורה מהתכנית?';
 var MSG_DEL_TASK = 'למחוק את המשימה?';
+var MSG_DEL_NOTE = 'למחוק את הפתק?';
 var MSG_DEL_LOOKUP = 'להסיר את הערך מהרשימה? רשומות שכבר משתמשות בו יישארו כמות שהן.';
-var MSG_DEL_SHT = 'למחוק את האיש מרשימת הו״ק? השיחות שלו יימחקו איתו.';
-var MSG_DEL_SHT_CALL = 'למחוק את השיחה?';
-var MSG_SHT_LOCKED = 'האיש בשימוש אצל טלפן אחר';
-var MSG_SHT_AMB = 'נא לבחור את השגריר המטלפן';
-var MSG_SHT_PICK = 'נא לבחור את תוצאת השיחה';
-var MSG_SHT_PHONE = 'נא למלא טלפון';
-var MSG_SHT_DUP = 'כבר ברשימה: ';
-var MSG_SHT_NO_NAME = 'שם לא ידוע';
-// דף השגרירים — בריפו הדפים הציבוריים (dapim), ולא באפליקציה: מי שמקבל קישור אינו מגיע לאפליקציה.
 var MSG_MONTH_GOAL = 'יעד חודשי';
 
 // ── עמידות אחסון מקומי ──
@@ -155,9 +126,8 @@ var KV_TABLE = 'gr_settings';
 
 // ── PUSH_CFG ──
 // הסדר שומר על המפתח הזר — כרטיסים לפני התחייבויות ושורות תכנית, התחייבויות לפני תשלומים, והלוואות לפני תנועותיהן;
-// אנשי השטרות אחרי הכרטיסים ולפני שיחותיהם, והקישורים האישיים אחרי הרשימות.
 var PUSH_TABLES = ['gr_donors', 'gr_pledges', 'gr_txns', 'gr_plan_items', 'gr_tasks', 'gr_targets',
-                   'gr_shtar_people', 'gr_shtar_calls', KV_TABLE, 'gr_lookups', 'gr_journal'];
+                   'gr_notes', KV_TABLE, 'gr_lookups', 'gr_journal'];
 
 // strip — עמודות שאינן נשמרות במראה; אין היום עמודה כזו, והמנגנון נשאר דרוך לסוד עתידי.
 // אין כאן סדר תצוגה — המיון של כל רשומה בפונקציה אחת בתחום.
@@ -168,8 +138,7 @@ var TABLES = [
   { t: 'gr_plan_items',   key: 'client_id', soft: true },
   { t: 'gr_tasks',        key: 'client_id', soft: true },
   { t: 'gr_targets',      key: 'client_id', soft: true },
-  { t: 'gr_shtar_people', key: 'client_id', soft: true },
-  { t: 'gr_shtar_calls',  key: 'client_id', soft: true },
+  { t: 'gr_notes',        key: 'client_id', soft: true },
   { t: KV_TABLE,         key: 'key',       soft: false },
   { t: 'gr_lookups',      key: 'client_id', soft: true },
   { t: 'gr_journal',      key: 'client_id', soft: true }
@@ -194,33 +163,21 @@ var TTL_PLAN_EDIT = 'עריכת שורה';
 var TTL_PLAN_NEW = 'שורה חדשה — ';
 var TTL_TASK_EDIT = 'עריכת משימה';
 var TTL_TASK_NEW = 'משימה חדשה';
-var TTL_CALL_EDIT = 'עריכת שיחה';
-var TTL_SHT_EDIT = 'עריכת הפרטים';
-var TTL_SHT_NEW = 'הוספה לרשימה';
-var MSG_SHT_CLEARED = 'נסלק';
-var MSG_SHT_CLEARED_PRE = 'לסמן שהתרומה של ';
-var MSG_SHT_CLEARED_Q = ' נסלקה?';
-var MSG_SHT_CLEARED_OK = 'סומן שנסלק';
-var MSG_SHT_DUP_TITLE = 'כפילות';
-var MSG_SHT_DUP_Q = '. לשמור בכל זאת?';
 var MSG_SAVE_ACT = 'שמירה';
 var MSG_DELETED = 'נמחק';
 var MSG_SAVED_OK = 'נשמר';
 var MSG_TASK_SAVED = 'המשימה נשמרה';
-var MSG_CALL_SAVED = 'השיחה נשמרה';
-var MSG_SHT_MOVED = 'הועבר';
 var MSG_REMOVED = 'הוסר';
 var MSG_GOAL_SAVED = 'היעד נשמר';
 var MSG_GOAL_RESET = 'החודש חזר ליעד הקבוע';
 var MSG_GOAL_DEFAULT_SAVED = 'היעד הקבוע נשמר';
 
 export { CAT_SUGGEST, ASSIGNEES, DONOR_NEW_LABEL, DONOR_NO_PHONE, EPS, KV_TABLE, LISTS, LK_AFFIL, LK_AMBASSADOR,
-         LK_DOMAIN, LK_METHOD, LK_PTYPE, LK_SECTION, MORE, MSG_DEL_SHT, MSG_DEL_SHT_CALL, MSG_SHT_AMB, MSG_SHT_DUP,
-         MSG_SHT_LOCKED, MSG_SHT_NO_NAME, MSG_SHT_PICK, MSG_SHT_PHONE, SHT_BEAT_MS, SHT_GIVE, SHT_LOCK_MS, SHT_NEXT, SHT_PAGE, SHT_RETRY_MS, SHT_STATUS,
+         LK_DOMAIN, LK_METHOD, LK_PTYPE, LK_SECTION, MORE,
          METHOD_SO, MSG_AMOUNT_POSITIVE, MSG_SO_COUNT, MSG_SO_FIRST, MSG_SO_FIRST_OVER, MSG_DELETE_ACT, MSG_DEL_DONOR,
-         MSG_DEL_LOOKUP, MSG_DEL_PAY, MSG_DEL_PLAN, MSG_DEL_PLEDGE, MSG_DEL_SOFT,
+         MSG_DEL_LOOKUP, MSG_DEL_NOTE, MSG_DEL_PAY, MSG_DEL_PLAN, MSG_DEL_PLEDGE, MSG_DEL_SOFT,
          MSG_DEL_TASK, MSG_DONOR_CREATED, MSG_MAYBE_STALE, MSG_MONTH_GOAL, MSG_NEED_DATE,
-         APP_FIRST_MONTH, MSG_NEED_NAME, LOAN_KINDS, MONTH_SHORT, MSG_CK_AMT, MSG_CK_COUNT, MSG_CK_FIRST, MSG_CK_SUM_PRE, MSG_LOAN_KIND, MSG_NEED_TITLE, MSG_NEED_VALUE, MSG_PICK_AMB, MSG_PICK_DONOR,
-         MSG_PICK_TYPE, MSG_PLEDGE_NO_AMB, MSG_PICK_VALID_MONTH, MSG_VALUE_EXISTS, PLAN_KINDS,
+         APP_FIRST_MONTH, MSG_NEED_NAME, LOAN_KINDS, MONTH_SHORT, MSG_CK_AMT, MSG_CK_COUNT, MSG_CK_FIRST, MSG_CK_SUM_PRE, MSG_LOAN_KIND, MSG_NEED_TITLE, MSG_NEED_VALUE, MSG_PICK_AMB, MSG_PICK_DONOR, MSG_PICK_SEC,
+         MSG_PICK_TYPE, MSG_PLEDGE_NO_AMB, MSG_PICK_VALID_MONTH, MSG_VALUE_EXISTS, NOTE_COLORS, PLAN_KINDS,
          PUSH_TABLES, STAGES, SUPABASE_ANON_KEY, SUPABASE_URL, TABLES, TABS,
-         TTL_MORE, TTL_EDIT_PRE, TTL_ADD_PRE, TTL_GOAL_DEFAULT, TTL_GOAL_YEAR, TTL_DONOR_EDIT, TTL_DONOR_NEW, TTL_PLEDGE_EDIT, TTL_PLEDGE_NEW, TTL_PAY_EDIT, TTL_PAY_NEW, TTL_PLAN_EDIT, TTL_PLAN_NEW, TTL_TASK_EDIT, TTL_TASK_NEW, TTL_CALL_EDIT, TTL_SHT_EDIT, TTL_SHT_NEW, MSG_SHT_CLEARED, MSG_SHT_CLEARED_PRE, MSG_SHT_CLEARED_Q, MSG_SHT_CLEARED_OK, MSG_SHT_DUP_TITLE, MSG_SHT_DUP_Q, MSG_SAVE_ACT, MSG_DELETED, MSG_SAVED_OK, MSG_TASK_SAVED, MSG_CALL_SAVED, MSG_SHT_MOVED, MSG_REMOVED, MSG_GOAL_SAVED, MSG_GOAL_RESET, MSG_GOAL_DEFAULT_SAVED };
+         TTL_MORE, TTL_EDIT_PRE, TTL_ADD_PRE, TTL_GOAL_DEFAULT, TTL_GOAL_YEAR, TTL_DONOR_EDIT, TTL_DONOR_NEW, TTL_PLEDGE_EDIT, TTL_PLEDGE_NEW, TTL_PAY_EDIT, TTL_PAY_NEW, TTL_PLAN_EDIT, TTL_PLAN_NEW, TTL_TASK_EDIT, TTL_TASK_NEW, MSG_SAVE_ACT, MSG_DELETED, MSG_SAVED_OK, MSG_TASK_SAVED, MSG_REMOVED, MSG_GOAL_SAVED, MSG_GOAL_RESET, MSG_GOAL_DEFAULT_SAVED };

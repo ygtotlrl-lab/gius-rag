@@ -62,7 +62,7 @@ function suggestHTML(m) {
   var got = {};
   monthTxnsInit(m).forEach(function (t) {
     var p = pledgeById(t.pledge_client_id), k = p && p.section ? p.section : '';
-    got[k] = (got[k] || 0) + monthAmount(t);
+    got[k] = (got[k] || 0) + monthAmount(t, m);
   });
   var total = sum(CAT_SUGGEST, function (c) { return c[1]; }), all = sum(CAT_SUGGEST, function (c) { return got[c[0]] || 0; });
   return '<section class="card sg"><h2>הצעת גיוס לפי הקטגוריות<span class="sg-tot">' + ils(all) + ' / ' + ils(total) + '</span></h2>' +

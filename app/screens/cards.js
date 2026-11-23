@@ -2,7 +2,7 @@
 import { dayToday, readNum } from '../../core/util.js';
 import { pendTag } from '../../core/sync.js';
 import { cardWinHTML, esc, methodGridHTML, methodIcon, methodPick as coreMethodPick, openModal, toast } from '../../core/ui.js';
-import { LK_AFFIL, LK_AMBASSADOR, LK_METHOD, LK_PTYPE, LK_SECTION, METHOD_SO, MSG_AMOUNT_POSITIVE, MSG_PICK_AMB,
+import { LK_AFFIL, LK_AMBASSADOR, LK_METHOD, LK_PTYPE, LK_SECTION, METHOD_SO, MSG_AMOUNT_POSITIVE, MSG_PICK_AMB, MSG_PICK_SEC,
          MSG_PLEDGE_NO_AMB, MSG_NEED_NAME, MSG_PICK_TYPE, MSG_PICK_VALID_MONTH, MSG_SO_COUNT, MSG_SO_FIRST,
          MSG_SO_FIRST_OVER, TTL_DONOR_EDIT, TTL_DONOR_NEW, TTL_PAY_EDIT, TTL_PAY_NEW, TTL_PLEDGE_EDIT, TTL_PLEDGE_NEW } from '../constants.js';
 import { state } from '../state.js';
@@ -227,7 +227,7 @@ function payRowHTML(t) {
       ' title="' + (t.cleared ? 'נסלק' : 'טרם נסלק') + '">' +
     '<span>' + esc(txnWhen(t)) + '</span><span>' + esc(t.method || '—') + (txnSoLabel(t) ? ' · ' + esc(txnSoLabel(t)) : '') + '</span>' +
     (t.note ? '<span class="pay-note">' + esc(t.note) + '</span>' : '') +
-    (t.not_initiated ? '<span class="badge">לא יזום</span>' : '') +
+    (t.not_initiated ? '<span class="badge">לא בתכנית הגיוס</span>' : '') +
     pendTag(pendRowKey('gr_txns', t.client_id)) +
     '<b>' + ils(t.amount) + '</b></button>';
 }
@@ -303,9 +303,9 @@ function formDonor(d) {
   openModal(d ? TTL_DONOR_EDIT : TTL_DONOR_NEW,
     '<label class="fld"><span>שם *</span><input class="inp" id="d-name" value="' + esc(d ? d.name : '') + '"></label>' +
     '<label class="fld"><span>שגריר</span>' + selectHTML('d-amb', amb, d ? d.ambassador : '', '— ללא —') + '</label>' +
-    '<div class="f2 dp-pair">' + datePairHTML('d-birth', d && d.birth_date ? d.birth_date : '', { empty: true, clear: true, start: '1980-01-01',
+    '<div class="f2 f2-tight dp-pair">' + datePairHTML('d-birth', d && d.birth_date ? d.birth_date : '', { empty: true, clear: true, start: '1980-01-01',
       labels: ['יום הולדת — לועזי', 'יום הולדת — עברי'] }) + '</div>' +
-    '<div class="f2">' +
+    '<div class="f2 f2-tight">' +
       '<label class="fld"><span>טלפון</span><input class="inp" id="d-phone" inputmode="tel" value="' + esc(d ? d.phone || '' : '') + '"></label>' +
       '<label class="fld"><span>תפקיד</span><input class="inp" id="d-role" value="' + esc(d ? d.role || '' : '') + '"></label>' +
     '</div>' +
@@ -314,7 +314,7 @@ function formDonor(d) {
       '<div class="dx-add"><div class="f2">' +
         '<label class="fld"><span>סוג</span>' + selectHTML('dx-kind', DATE_KINDS.map(function (k) { return k[1]; }), DATE_KINDS[0][1], '') + '</label>' +
         '<label class="fld"><span>של מי / פירוט</span><input class="inp" id="dx-label" placeholder="למשל: הבת רבקה"></label>' +
-      '</div><div class="f2 dp-pair">' + datePairHTML('dx', '', { empty: true, start: '1980-01-01' }) + '</div>' +
+      '</div><div class="f2 f2-tight dp-pair">' + datePairHTML('dx', '', { empty: true, start: '1980-01-01' }) + '</div>' +
       '<button type="button" class="btn ghost" data-act="dx-add">' + icon('plus') + 'הוספת תאריך</button></div></div>' +
     affChipsHTML(d) +
     '<label class="fld chk"><input type="checkbox" id="d-general"' + (d && d.is_general ? ' checked' : '') + '><span>כרטיס כללי — מגבית, פרויקט וכדומה; מוצג בנפרד בתחתית הרשימה</span></label>',
@@ -344,7 +344,7 @@ function formPledge(p, donorId) {
   if (!d) return;
   // הטופס צפוף: סעיף · סוג · שגריר בשורה אחת, פירוט (רוב השורה) וסכום צר בשורה, הערות לכל הרוחב.
   var body = '<div class="f3">' +
-      '<label class="fld"><span>קטגוריה</span>' + selectHTML('p-section', lookupLabels(LK_SECTION), p ? p.section : '', 'קטגוריה') + '</label>' +
+      '<label class="fld"><span>קטגוריה *</span>' + selectHTML('p-section', lookupLabels(LK_SECTION), p ? p.section : '', 'קטגוריה') + '</label>' +
       '<label class="fld"><span>סוג *</span>' + selectHTML('p-type', lookupLabels(LK_PTYPE), p ? p.pledge_type : '', 'סוג') + '</label>' +
       '<label class="fld"><span>שגריר *</span>' + selectHTML('p-amb', lookupLabels(LK_AMBASSADOR), p ? p.ambassador : (d.ambassador || ''), 'שגריר') + '</label>' +
     '</div>' +
@@ -373,6 +373,8 @@ function formPledge(p, donorId) {
 
 function savePledge(id, donorId) {
   var type = val('p-type'), amount = readNum($('#p-amount'), 0);
+  // הקטגוריה חובה — ממנה הדשבורד והתכנית משייכים את התשלומים
+  if (!val('p-section')) { toast(MSG_PICK_SEC, null, 'warn'); return; }
   if (!type) { toast(MSG_PICK_TYPE, null, 'warn'); return; }
   // הסכום רשות — יש מי שמתחייב בלי סכום; ריק נשמר 0. תשלום מיידי — רק עם סכום.
   if (amount < 0) { toast(MSG_AMOUNT_POSITIVE, null, 'warn'); return; }
@@ -402,7 +404,7 @@ function savePledge(id, donorId) {
 
 // «תשלום לא יזום» — תיבת סימון בטופס התשלום, כבויה כברירה: כל תשלום נספר בדשבורד, ורק מה שסומן אינו נספר.
 function noInitHTML(px, on) {
-  return '<label class="fld chk"><input type="checkbox" id="' + px + '-noinit"' + (on ? ' checked' : '') + '><span>תשלום לא יזום — לא להציג בדשבורד</span></label>';
+  return '<label class="fld chk"><input type="checkbox" id="' + px + '-noinit"' + (on ? ' checked' : '') + '><span>תשלום לא בתכנית הגיוס — לא להציג בדשבורד</span></label>';
 }
 
 // אמצעי התשלום — הרשת של הליבה (methodGridHTML); הערך בשדה הנסתר <px>-method, והקוראים נשארים val().

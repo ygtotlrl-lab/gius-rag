@@ -53,7 +53,7 @@ function viewSettings() {
       '<button class="btn sm" data-act="target-set">' + icon('plus') + 'יעד לחודש</button></div>';
   if (!tg.length) h += '<div class="hint">אין — כל החודשים ביעד הקבוע.</div>';
   else h += tg.map(function (t) {
-    var got = sum(monthTxnsInit(t.target_month), monthAmount);
+    var got = sum(monthTxnsInit(t.target_month), function (x) { return monthAmount(x, t.target_month); });
     var pct = num(t.amount) > 0 ? got / num(t.amount) * 100 : 0;
     return '<div class="row" data-act="target-set" data-month="' + esc(t.target_month) + '">' +
       '<div class="main"><b>' + esc(monthLabel(t.target_month)) + '</b><small>נגבה ' + ils(got) + ' · ' + pct.toFixed(0) + '%</small></div>' +

@@ -13,9 +13,9 @@ import { actWire, ask, closeAsk, closeModal, comboFocus, comboInput, comboMake, 
          dragCancel, dragDown, dragMove, dragUp, esc, lookupSeed, modalDismiss, openModal, shellBare,
          swApply, swHideUpdate, toast, uiNoDialog } from '../core/ui.js';
 import { KV_TABLE, MORE, MSG_DELETE_ACT, MSG_DEL_DONOR, MSG_DEL_LOOKUP,
-         MSG_DEL_PAY, MSG_DEL_SHT, MSG_DEL_SHT_CALL, MSG_DEL_PLAN, MSG_DEL_PLEDGE, MSG_DEL_SOFT, MSG_DEL_TASK,
+         MSG_DEL_NOTE, MSG_DEL_PAY, MSG_DEL_PLAN, MSG_DEL_PLEDGE, MSG_DEL_SOFT, MSG_DEL_TASK,
          MSG_NEED_VALUE, MSG_VALUE_EXISTS, PUSH_TABLES, STAGES, SUPABASE_ANON_KEY, SUPABASE_URL, TABLES,
-         TABS, APP_FIRST_MONTH, SHT_PAGE, MSG_CALL_SAVED, MSG_DELETED, MSG_GOAL_DEFAULT_SAVED, MSG_GOAL_RESET, MSG_GOAL_SAVED, MSG_REMOVED, MSG_SAVED_OK, MSG_SHT_MOVED, MSG_TASK_SAVED, TTL_MORE } from './constants.js';
+         TABS, APP_FIRST_MONTH, MSG_DELETED, MSG_GOAL_DEFAULT_SAVED, MSG_GOAL_RESET, MSG_GOAL_SAVED, MSG_REMOVED, MSG_SAVED_OK, MSG_TASK_SAVED, TTL_MORE } from './constants.js';
 import { S, shell, state } from './state.js';
 import { $, applyMirrorToState, donorById, donorNewCancel, donorNewSave, listDef, lookupById,
          lookupPut, lookupRows, mirrorHasData, monthKeyOf, pendRowKey, pledgeById, rowPendingKey,
@@ -27,9 +27,8 @@ import { DATEPAIR_ACTIONS } from '../core/datepair.js';
 import { datesAdd, datesDel, cardRowsHTML, cardShare, formDonor, methodPick, payPledgePick, formPay, formPledge, pSoSync, saveDonor, savePay, savePledge, soSync,
          soUneqToggle, viewCards } from './screens/cards.js';
 import { formPlan, planShare, savePlan, viewPlan } from './screens/plan.js';
-import { formTask, saveTask, tasksBodyHTML, tasksShare, viewTasks } from './screens/tasks.js';
-import { callById, callStatusPick, formCall, formShtar, personById, saveCall, saveShtar, shtCallSave, shtClose, formNext, saveNext, shtNextTo, shtListHTML, shtMethodPick, shtOpen, shtRefresh,
-         shtStatusPick, shtStep, viewShtarot } from './screens/shtarot.js';
+import { formTask, saveTask, subAdd, subEdDot, subRm, taskSubToggle, tasksBodyHTML, tasksShare, viewTasks } from './screens/tasks.js';
+import { closeNoteFull, formNote, noteColorPick, viewNotes } from './screens/notes.js';
 import { formTarget, formTargetDefault, lookupForm, saveTarget, saveTargetDefault,
          viewSettings } from './screens/settings.js';
 
@@ -116,8 +115,7 @@ var BK_CFG = {
       { name: 'gr_plan_items',   order: 'client_id', ts: 'updated_at' },
       { name: 'gr_tasks',        order: 'client_id', ts: 'updated_at' },
       { name: 'gr_targets',      order: 'client_id', ts: 'updated_at' },
-      { name: 'gr_shtar_people', order: 'client_id', ts: 'updated_at' },
-      { name: 'gr_shtar_calls',  order: 'client_id', ts: 'updated_at' },
+      { name: 'gr_notes',        order: 'client_id', ts: 'updated_at' },
       { name: KV_TABLE,         order: 'key',       ts: 'updated_at' },
       { name: 'gr_lookups',      order: 'client_id', ts: 'updated_at' },
     ];
@@ -189,10 +187,10 @@ document.title = self.APP.name;
 var VIEW_LOADING = '<div class="view-loading" role="status" aria-label="טוען"><span class="view-spin"></span></div>';
 
 // הכפתור הצף — הוספה במסך שיש בו מה להוסיף; בלוח הבקרה ובהגדרות אין.
-var FAB_ACT = { cards: 'donor-new', plan: 'plan-new', tasks: 'task-new', shtarot: 'sht-new' };
+var FAB_ACT = { cards: 'donor-new', plan: 'plan-new', tasks: 'task-new', notes: 'note-new' };
 
 var VIEWS = { dash: viewDash, cards: viewCards, plan: viewPlan, journal: viewJournal, tasks: viewTasks,
-              shtarot: viewShtarot, settings: viewSettings };
+              notes: viewNotes, settings: viewSettings };
 
 function tabOf(id) {
   var all = TABS.concat(MORE);
@@ -228,8 +226,6 @@ function renderShell() {
 
 function render() {
   renderShell();
-  // שטרות — מסך שכבר מצויר מתעדכן בחלקיו: הרשימה ארוכה, והכרטיס הפתוח נושא שדות ומקום גלילה.
-  if (state.screen === 'shtarot' && S.lastViewKey === 'shtarot' && shtRefresh()) return;
   // יומן — שדה שמקלידים בו אינו נדרס בציור שאחרי הסנכרון; הוא נשמר בעצמו בהפסקת ההקלדה
   var ae = document.activeElement;
   if (state.screen === 'journal' && S.lastViewKey === 'journal' && ae && ae.dataset && ae.dataset.inp === 'j-body') return;
@@ -240,14 +236,11 @@ function render() {
 
 // כניסה למסך — לוח הבקרה והתכנית בחודש של היום; הכרטיסים בלי סינון, לפי א״ב ובלי כרטיס פתוח.
 function go(screen) {
-  // איש שנשאר פתוח בשטרות — הנעילה שלו משתחררת ביציאה מהמסך.
-  if (state.sht.open) shtClose();
   state.screen = screen;
   var m = monthKeyOf(dayToday());
   if (screen === 'dash') { state.month = m; state.dashPayAll = false; }
   if (screen === 'plan') { state.planMonth = m; state.planOpen = {}; }
   if (screen === 'cards') state.cards = { q: '', aff: '', pf: '', sort: 'sum', open: null, plOpen: null, tlOpen: false };
-  if (screen === 'shtarot') { state.sht.q = ''; state.sht.f = 'queue'; state.sht.lim = 0; state.sht.nav = []; }
   if (screen === 'tasks') { state.tasks_ui.stage = null; state.tasks_ui.q = ''; }
   if (screen === 'journal') { state.jDay = dayToday(); state.jArc = false; }
   closeModal();
@@ -258,12 +251,6 @@ function go(screen) {
 function tasksRefresh() {
   var box = $('#tasks-body');
   if (box) box.innerHTML = tasksBodyHTML(); else render();
-}
-
-// בשטרות הרשימה ארוכה והכרטיס נושא שדות — הציור החלקי שומר על החיפוש, על הגלילה ועל מה שהוקלד.
-function shtListRefresh() {
-  var box = $('#sht-list');
-  if (box) box.innerHTML = shtListHTML(); else render();
 }
 
 function cardsRefresh() {
@@ -360,7 +347,7 @@ var DOM_ACTIONS = {
   },
   'pledge-del': function (el) { return delAsk(MSG_DEL_PLEDGE, 'gr_pledges', el.dataset.id); },
   'pay-new': function (el) { formPay(null, el.dataset.pledge, el.dataset.donor); },
-  'method-pick': function (el) { if (/^(sht|sc)-/.test(el.dataset.target)) return shtMethodPick(el); methodPick(el); },
+  'method-pick': function (el) { methodPick(el); },
   'pay-edit': function (el) { var t = findIn(state.txns, el.dataset.id); if (t) formPay(t); },
   'pay-save': function (el) {
     return runSave(function () { return savePay(el.dataset.id, el.dataset.pledge); }, 'התשלום נשמר');
@@ -404,6 +391,11 @@ var DOM_ACTIONS = {
     if (!t) return;
     return update('gr_tasks', t.client_id, { starred: !t.starred }).then(function () { render(); }).catch(errToast);
   },
+  // תת-משימה — העיגול בשורה מסמן «הושלם» בלי לפתוח; בעורך — הוספה, הסרה וסימון שנשמרים עם המשימה
+  'task-sub': function (el) { var p = taskSubToggle(el); return p && p.then(function () { render(); }).catch(errToast); },
+  'sub-add': function () { subAdd(); },
+  'sub-rm': function (el) { subRm(el); },
+  'sub-ed-dot': function (el) { subEdDot(el); },
   'task-save': saver(saveTask, MSG_TASK_SAVED),
   'task-del': function (el) { return delAsk(MSG_DEL_TASK, 'gr_tasks', el.dataset.id); },
 
@@ -413,25 +405,10 @@ var DOM_ACTIONS = {
   'j-share': function () { return journalShare(state.jDay); },
 
   // ── שטרות ──
-  'sht-filter': function (el) { state.sht.f = el.dataset.v; state.sht.lim = 0; render(); },
-  'sht-more': function () { state.sht.lim = (state.sht.lim || SHT_PAGE) + SHT_PAGE * 4; shtListRefresh(); },
-  'sht-open': function (el) { return shtOpen(el.dataset.id); },
-  'sht-step': function (el) { return shtStep(+el.dataset.d); },
-  'sht-close': function () { shtClose(); render(); },
-  'sht-st': function (el) { shtStatusPick(el); },
-  'sht-call-save': function () { return runSave(shtCallSave, MSG_CALL_SAVED); },
-  'sht-call-edit': function (el) { var c = callById(el.dataset.id); if (c) formCall(c); },
-  'sht-call-update': saver(saveCall, MSG_CALL_SAVED),
-  'sht-call-del': function (el) {
-    return delAsk(MSG_DEL_SHT_CALL, 'gr_shtar_calls', el.dataset.id, function () { if (state.sht.call === el.dataset.id) state.sht.call = null; });
-  },
-  'sht-next': function (el) { var c = callById(el.dataset.id); if (c) formNext(c); },
-  'sht-next-to': function (el) { shtNextTo(el); },
-  'sht-next-save': saver(saveNext, MSG_SHT_MOVED),
-  'sht-new': function () { formShtar(null); },
-  'sht-edit': function (el) { var p = personById(el.dataset.id); if (p) formShtar(p); },
-  'sht-save': saver(saveShtar, MSG_SAVED_OK),
-  'sht-del': function (el) { return delAsk(MSG_DEL_SHT, 'gr_shtar_people', el.dataset.id, function () { shtClose(); }); },
+  'note-new': function () { formNote(null); },
+  'note-edit': function (el) { var n = findIn(state.notes, el.dataset.id); if (n) formNote(n); },
+  'note-close': function () { return runSave(function () { return closeNoteFull(true); }, MSG_SAVED_OK); },
+  'note-del': function (el) { return delAsk(MSG_DEL_NOTE, 'gr_notes', el.dataset.id, function () { closeNoteFull(false); }); },
 
   // ── הגדרות: הרשימות ──
   // הזריעה קודמת לכל עריכה — רשימה שמוצגת מנקודת הפתיחה אינה נושאת שורות, ופריט אחד שנוסף היה מוחק את השאר.
@@ -506,17 +483,20 @@ document.addEventListener('input', function (e) {
   if (el.dataset.inp === 'cards-q') { state.cards.q = el.value; cardsRefresh(); }
   if (el.dataset.inp === 'tasks-q') { state.tasks_ui.q = el.value; tasksRefresh(); }
   if (el.dataset.inp === 'j-body') { journalBody(el); return; }
-  if (el.dataset.inp === 'sht-q') { state.sht.q = el.value; state.sht.lim = 0; shtListRefresh(); }
   if (el.dataset.inp === 'pay-so') soSync();
   if (el.dataset.inp === 'p-so' || el.id === 'p-amount') pSoSync();
 });
 
+// Enter בשורת תת-משימה פותח את הבאה — ואינו שומר את הטופס
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && e.target && e.target.classList && e.target.classList.contains('sub-in')) { e.preventDefault(); e.stopPropagation(); subAdd(); }
+}, true);
+document.addEventListener('note-close', function () { DOM_ACTIONS['note-close'](); });
 document.addEventListener('change', function (e) {
   var el = e.target;
   if (!el.dataset) return;
+  if (el.dataset.chg === 'note-color') { noteColorPick(el.value); return; }
   if (el.dataset.chg === 'cards-aff') { state.cards.aff = el.value; cardsRefresh(); return; }
-  if (el.dataset.chg === 'sc-status') { callStatusPick(el.value); return; }
-  if (el.dataset.chg === 'sht-res') { state.sht.f = el.value || 'queue'; state.sht.lim = 0; render(); return; }
   if (el.dataset.chg === 'cards-pf') { state.cards.pf = el.value; cardsRefresh(); return; }
   if (el.dataset.chg === 'p-now') { var nb = $('#p-now-box'); if (nb) nb.hidden = !el.checked; return; }
   // תאריך שנבחר מעביר את החודש אחריו — שני שדות שסותרים זה את זה היו נשמרים בשקט.

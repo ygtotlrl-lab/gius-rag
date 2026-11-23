@@ -42,12 +42,12 @@ function gStat(ic, lab, val) {
 }
 
 // הסעיף והשגריר של תשלום — מההתחייבות שהוא נזקף אליה; התשלום עצמו אינו נושא אותם.
-function groupBy(list, pick, fallback) {
+function groupBy(list, pick, fallback, m) {
   var map = {}, order = [];
   list.forEach(function (t) {
     var k = String(pick(t) || '').trim() || fallback;
     if (!map[k]) { map[k] = { key: k, total: 0, count: 0 }; order.push(k); }
-    map[k].total += monthAmount(t);
+    map[k].total += monthAmount(t, m);
     map[k].count++;
   });
   return gSortGroups(order.map(function (k) { return map[k]; }));
@@ -103,7 +103,7 @@ function kShort(v) { return v >= 1e6 ? (Math.round(v / 1e5) / 10) + 'M' : v >= 1
 // היעד השנתי — מה שנגבה מתחילת השנה מול יעד השנה, פס ההתקדמות, ועמודה לכל חודש מול היעד החודשי
 function yearHTML(m) {
   var ms = yearMonths(m), goal = targetYear();
-  var rows = ms.map(function (k) { return { m: k, v: sum(monthTxnsInit(k), monthAmount), t: targetFor(k) }; });
+  var rows = ms.map(function (k) { return { m: k, v: sum(monthTxnsInit(k), function (t) { return monthAmount(t, k); }), t: targetFor(k) }; });
   var got = sum(rows, function (r) { return r.v; }), pct = goal > 0 ? got / goal * 100 : 0;
   var max = Math.max.apply(null, rows.map(function (r) { return Math.max(r.v, r.t); }).concat([1]));
   return '<section class="card yr"><h2>היעד השנתי · ' + esc(m.slice(0, 4)) + '</h2>' +
@@ -145,7 +145,7 @@ function complyHTML(rows) {
 function viewDash() {
   var m = state.month;
   var txns = monthTxnsInit(m);
-  var collected = sum(txns, monthAmount);
+  var collected = sum(txns, function (t) { return monthAmount(t, m); });
   var target = targetFor(m);
   var remaining = Math.max(0, target - collected);
   var pct = target > 0 ? collected / target * 100 : 0;
@@ -171,7 +171,7 @@ function viewDash() {
 
   // הפילוח — לפי הקטגוריה של ההתחייבות (אין פילוח שגרירים: התכנית והדשבורד לפי הקטגוריות)
   h += '<section class="card"><h2>פילוח קטגוריות</h2>' +
-      breakdownHTML(groupBy(txns, function (t) { return pledgeField(t, 'section'); }, 'ללא קטגוריה'), collected, true) +
+      breakdownHTML(groupBy(txns, function (t) { return pledgeField(t, 'section'); }, 'ללא קטגוריה', m), collected, true) +
     '</section>';
 
   h += '<section class="card"><h2>משימות</h2>' + tasksHTML() + '</section>';
@@ -185,7 +185,7 @@ function viewDash() {
     // «קבלה» — רכיב הליבה: קבוצה לכל יום (התאריך של התשלום, ובלעדיו החודש); מה שטרם נסלק — מקווקו והסכום אפור.
     h += receiptHTML(shown.map(function (t) {
       var p = pledgeById(t.pledge_client_id);
-      return { day: txnWhen(t), amt: ils(monthAmount(t)), method: t.method || '', ico: icon(methodIcon(t.method)),
+      return { day: t.txn_month === m ? txnWhen(t) : monthLabel(m), amt: ils(monthAmount(t, m)), method: t.method || '', ico: icon(methodIcon(t.method)),
         who: '<b>' + esc(donorName(t.donor_client_id)) + pendTag(pendRowKey('gr_txns', t.client_id)) + '</b>' +
           '<small>' + esc((p && (p.pledge_type || p.section)) || '—') + (txnSoLabel(t) ? ' · ' + esc(txnSoLabel(t)) : '') + '</small>',
         dashed: !t.cleared, muted: !t.cleared, title: t.cleared ? '' : 'טרם נסלק', act: 'card-go', id: t.donor_client_id };
