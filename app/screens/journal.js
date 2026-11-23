@@ -6,7 +6,7 @@ import { hebrewDate } from '../../core/hebrew.js';
 import { LK_SECTION } from '../constants.js';
 import { state } from '../state.js';
 import { icon } from '../icons.js';
-import { snapShare } from '../snap.js';
+import { snapShare } from '../../core/snap.js';
 import { dmyDate, emptyBox, insert, lookupLabels, update } from '../domain.js';
 
 // «משימות כלליות» — חלון קבוע אחרי הקטגוריות

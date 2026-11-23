@@ -118,7 +118,21 @@ function yearHTML(m) {
         '<span class="yr-fill ' + stageCls(r.t > 0 ? r.v / r.t * 100 : 0) + '" style="--v:' + (r.v / max).toFixed(3) + '"></span></span>' +
         '<span class="yr-lab">' + esc(MONTH_SHORT[+p[1] - 1]) + '</span></div>';
     }).join('') + '</div>' : '') +
+    complyHTML(rows) +
   '</section>';
+}
+
+// עמידה ביעד — ממוצע החודשים שחלפו בשנה (עד לפני החודש של היום) מול ממוצע היעד שלהם; מתעדכן בסוף כל חודש
+function complyHTML(rows) {
+  var now = dayToday().slice(0, 7);
+  var past = rows.filter(function (r) { return r.m < now; });
+  if (!past.length) return '<div class="yr-comply none">עמידה ביעד — תחושב בסוף החודש הראשון של השנה</div>';
+  var avg = sum(past, function (r) { return r.v; }) / past.length, tgt = sum(past, function (r) { return r.t; }) / past.length;
+  if (!(tgt > 0)) return '';
+  var ok = avg >= tgt;
+  return '<div class="yr-comply ' + (ok ? 'ok' : 'bad') + '">' + icon(ok ? 'check' : 'warn') +
+    '<span><b>' + (ok ? 'עומדים ביעד' : 'מתחת ליעד') + '</b> — ממוצע ' + past.length + (past.length === 1 ? ' החודש שחלף' : ' החודשים שחלפו') + ': ' +
+    ils(Math.round(avg)) + ' לחודש, מול יעד של ' + ils(Math.round(tgt)) + ' (' + Math.round(avg / tgt * 100) + '%)</span></div>';
 }
 
 function viewDash() {
@@ -176,4 +190,4 @@ function viewDash() {
   return h;
 }
 
-export { viewDash };
+export { sectionIcon, viewDash };

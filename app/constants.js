@@ -42,6 +42,10 @@ var LISTS = [
 // שלושת האחראים קבועים — אין להם רשימה בהגדרות.
 var ASSIGNEES = ['הרב ליפש', 'שמוליק מישולובין'];
 
+// הצעת הגיוס החודשית לכל קטגוריה — מה שמכוונים לגייס בחודש, בתחתית התכנית
+var CAT_SUGGEST = [['גבירים', 2000], ['הו״ק', 500], ['הקדשת התוועדויות שבת', 500], ['עליות לתורה', 1500],
+  ['מגביות', 2000], ['דינר/קמפיין', 2000], ['מרכז החסד', 1000], ['תקציבים ועירייה', 1000]];
+
 var STAGES = [
   { id: 'בעבודה', cls: 'run' },
   { id: 'הושלם', cls: 'done' },
@@ -120,9 +124,6 @@ var MSG_AMOUNT_POSITIVE = 'נא להזין סכום גדול מאפס';
 var MSG_SO_COUNT = 'מספר הפעימות — 2 לפחות';
 var MSG_SO_FIRST = 'הפעימה הראשונה — סכום חיובי';
 var MSG_SO_FIRST_OVER = 'הפעימה הראשונה גדולה מהסכום הכולל';
-var MSG_IMG_PREP = 'מכין תמונה...';
-var MSG_IMG_OFFLINE = 'יצירת התמונה לא זמינה — נדרש חיבור לאינטרנט פעם אחת';
-var MSG_IMG_FAIL = 'יצירת התמונה נכשלה — נסה שוב';
 // האמצעי שפותח את הפעימות — שורה ברשימת האמצעים, והתשלום עצמו מסווג לפי installments ולא לפי התווית.
 var METHOD_SO = 'הו״ק';
 var MSG_NEED_DATE = 'נא לבחור תאריך';
@@ -213,10 +214,10 @@ var MSG_GOAL_SAVED = 'היעד נשמר';
 var MSG_GOAL_RESET = 'החודש חזר ליעד הקבוע';
 var MSG_GOAL_DEFAULT_SAVED = 'היעד הקבוע נשמר';
 
-export { ASSIGNEES, DONOR_NEW_LABEL, DONOR_NO_PHONE, EPS, KV_TABLE, LISTS, LK_AFFIL, LK_AMBASSADOR,
+export { CAT_SUGGEST, ASSIGNEES, DONOR_NEW_LABEL, DONOR_NO_PHONE, EPS, KV_TABLE, LISTS, LK_AFFIL, LK_AMBASSADOR,
          LK_DOMAIN, LK_METHOD, LK_PTYPE, LK_SECTION, MORE, MSG_DEL_SHT, MSG_DEL_SHT_CALL, MSG_SHT_AMB, MSG_SHT_DUP,
          MSG_SHT_LOCKED, MSG_SHT_NO_NAME, MSG_SHT_PICK, MSG_SHT_PHONE, SHT_BEAT_MS, SHT_GIVE, SHT_LOCK_MS, SHT_NEXT, SHT_PAGE, SHT_RETRY_MS, SHT_STATUS,
-         METHOD_SO, MSG_AMOUNT_POSITIVE, MSG_SO_COUNT, MSG_SO_FIRST, MSG_SO_FIRST_OVER, MSG_IMG_PREP, MSG_IMG_OFFLINE, MSG_IMG_FAIL, MSG_DELETE_ACT, MSG_DEL_DONOR,
+         METHOD_SO, MSG_AMOUNT_POSITIVE, MSG_SO_COUNT, MSG_SO_FIRST, MSG_SO_FIRST_OVER, MSG_DELETE_ACT, MSG_DEL_DONOR,
          MSG_DEL_LOOKUP, MSG_DEL_PAY, MSG_DEL_PLAN, MSG_DEL_PLEDGE, MSG_DEL_SOFT,
          MSG_DEL_TASK, MSG_DONOR_CREATED, MSG_MAYBE_STALE, MSG_MONTH_GOAL, MSG_NEED_DATE,
          APP_FIRST_MONTH, MSG_NEED_NAME, LOAN_KINDS, MONTH_SHORT, MSG_CK_AMT, MSG_CK_COUNT, MSG_CK_FIRST, MSG_CK_SUM_PRE, MSG_LOAN_KIND, MSG_NEED_TITLE, MSG_NEED_VALUE, MSG_PICK_AMB, MSG_PICK_DONOR,

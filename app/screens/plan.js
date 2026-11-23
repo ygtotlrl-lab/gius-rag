@@ -3,13 +3,15 @@
 import { readNum } from '../../core/util.js';
 import { pendTag } from '../../core/sync.js';
 import { comboValue, esc, openModal, toast } from '../../core/ui.js';
-import { APP_FIRST_MONTH, LK_AMBASSADOR, LK_SECTION, MSG_PICK_DONOR, PLAN_KINDS, TTL_PLAN_EDIT, TTL_PLAN_NEW } from '../constants.js';
+import { CAT_SUGGEST, APP_FIRST_MONTH, LK_AMBASSADOR, LK_SECTION, MSG_PICK_DONOR, PLAN_KINDS, TTL_PLAN_EDIT, TTL_PLAN_NEW } from '../constants.js';
 import { state } from '../state.js';
 import { icon } from '../icons.js';
-import { snapShare } from '../snap.js';
+import { snapShare } from '../../core/snap.js';
+import { bar } from '../../core/chart.js';
+import { sectionIcon } from './dash.js';
 import { $, dmyDate, donorById, donorFieldHTML, donorName, emptyBox, gSortPlan, ils, insert,
          lookupLabels, monthLabel, nextSort, nullable, pendRowKey, planActual, planGroup, planOfMonth, pledgesOfDonor,
-         selectHTML, sum, update, val } from '../domain.js';
+         selectHTML, sum, update, val, monthTxnsInit, monthAmount, pledgeById } from '../domain.js';
 
 function viewPlan() {
   var m = state.planMonth, list = gSortPlan(planOfMonth(m));
@@ -52,7 +54,25 @@ function viewPlan() {
     }).join('');
   }
   h += '</section>';
-  return h;
+  return h + suggestHTML(m);
+}
+
+// הצעת הגיוס לפי הקטגוריות — לכל קטגוריה מה שמכוונים לגייס בחודש, ומה שנגבה בה בחודש המוצג (לפי הקטגוריה של ההתחייבות)
+function suggestHTML(m) {
+  var got = {};
+  monthTxnsInit(m).forEach(function (t) {
+    var p = pledgeById(t.pledge_client_id), k = p && p.section ? p.section : '';
+    got[k] = (got[k] || 0) + monthAmount(t);
+  });
+  var total = sum(CAT_SUGGEST, function (c) { return c[1]; }), all = sum(CAT_SUGGEST, function (c) { return got[c[0]] || 0; });
+  return '<section class="card sg"><h2>הצעת גיוס לפי הקטגוריות<span class="sg-tot">' + ils(all) + ' / ' + ils(total) + '</span></h2>' +
+    '<div class="sg-grid">' + CAT_SUGGEST.map(function (c) {
+      var g = got[c[0]] || 0, pct = c[1] > 0 ? g / c[1] * 100 : 0;
+      return '<div class="sg-it' + (g >= c[1] ? ' done' : '') + '"><span class="sg-ic">' + icon(sectionIcon(c[0])) + '</span>' +
+        '<span class="sg-n">' + esc(c[0]) + '</span><b class="sg-v">' + ils(c[1]) + '</b>' +
+        '<span class="sg-bar">' + bar(Math.min(100, pct).toFixed(1), g >= c[1] ? 'ok' : 'gold') + '</span>' +
+        '<small class="sg-g">נגבה החודש ' + ils(g) + '</small></div>';
+    }).join('') + '</div></section>';
 }
 
 // כותרת קטגוריה — שם · מונה · בפועל / צפי · אחוז; «לא רלוונטי» אינו נספר.

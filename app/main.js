@@ -23,7 +23,8 @@ import { $, applyMirrorToState, donorById, donorNewCancel, donorNewSave, listDef
 import { icon } from './icons.js';
 import { viewDash } from './screens/dash.js';
 import { journalBody, journalShare, viewJournal } from './screens/journal.js';
-import { cardRowsHTML, cardShare, formDonor, methodPick, payPledgePick, formPay, formPledge, pSoSync, saveDonor, savePay, savePledge, soSync,
+import { DATEPAIR_ACTIONS } from '../core/datepair.js';
+import { datesAdd, datesDel, cardRowsHTML, cardShare, formDonor, methodPick, payPledgePick, formPay, formPledge, pSoSync, saveDonor, savePay, savePledge, soSync,
          soUneqToggle, viewCards } from './screens/cards.js';
 import { formPlan, planShare, savePlan, viewPlan } from './screens/plan.js';
 import { formTask, saveTask, tasksBodyHTML, tasksShare, viewTasks } from './screens/tasks.js';
@@ -347,6 +348,8 @@ var DOM_ACTIONS = {
   'donor-new': function () { formDonor(null); },
   'donor-edit': function (el) { formDonor(donorById(el.dataset.id)); },
   'donor-save': saver(saveDonor, MSG_SAVED_OK),
+  'dx-add': function () { datesAdd(); },
+  'dx-del': function (el) { datesDel(el.dataset.i); },
   'donor-del': function (el) {
     return delAsk(MSG_DEL_DONOR, 'gr_donors', el.dataset.id, function () { state.cards.open = null; });
   },
@@ -492,7 +495,7 @@ var DOM_ACTIONS = {
 };
 
 // ── מאזינים גלובליים ──
-Object.assign(DOM_ACTIONS, GAUTH_ACTIONS);
+Object.assign(DOM_ACTIONS, GAUTH_ACTIONS, DATEPAIR_ACTIONS);
 actWire(DOM_ACTIONS);
 
 // החיפוש מרנדר רק את הרשימה — רינדור מלא בונה מחדש את השדה ומאבד את הפוקוס אחרי כל תו.
