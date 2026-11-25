@@ -40,8 +40,9 @@
 .reload-btn{margin-top:var(--sp-6)}
 
 /* ── נקודות שבירה ── */
+/* 360 · 480 — אין שינוי: הפריסה הבסיסית היא של הטלפון. */
 /* מסך רחב — כל המסכים בסרגל, בלי «עוד». */
-@media (min-width:1100px){
+@media (min-width:1200px){
   .tabbar .wide-only{display:flex}
   .tabbar .narrow-only{display:none}
 }
@@ -243,7 +244,7 @@ main #sht-give > .card{margin-bottom:var(--sp-6)}
 /* כרטיס האיש — מספר הטלפון מתחת לאייקונים של החיוג וההודעה. */
 .sht-side{display:flex;flex-direction:column;align-items:flex-end;gap:var(--sp-3);flex:none}
 .sht-phone{font-size:var(--fs-2);font-variant-numeric:tabular-nums;background:rgba(255,255,255,.16);border-radius:var(--r-7);padding:var(--sp-1) var(--sp-5)}
-@media (max-width:639px){
+@media not all and (min-width:640px){
   .sht-side{position:absolute;top:var(--sp-5);inset-inline-end:var(--sp-5)}
   .sht-side .cp-acts{position:static}
   .sht-card .cp-who{min-height:64px}
