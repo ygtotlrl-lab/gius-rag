@@ -1,4 +1,4 @@
--- migrations/000_schema.sql — גיוס לבית חב"ד רמת אביב ג׳ (gius-rag): הטבלאות gr_ בפרויקט של גיוס
+-- migrations/000_schema.sql — גיוס לבית חב"ד רמת אביב ג׳ (gius-rag): הטבלאות gr_ בפרויקט Supabase של הלקוח (bwlsogunthyqwklzkrrd, הארגון shmulik5779)
 
 -- נגזרות במבנה מטבלאות g_ של גיוס (like … including all), בלי הלוואות, רשומות ותקציב אירוע; ובנוסף gr_journal ו-gr_users.
 -- sh_backup ו-sh_sync_log — המשותפות לפרויקט, בקובץ הסכימה של גיוס.
@@ -207,7 +207,6 @@ create table if not exists public.gr_tasks (
   starred boolean not null default false,
   subtasks jsonb not null default '[]'::jsonb,
   constraint gr_tasks_pkey PRIMARY KEY (client_id),
-  constraint g_tasks_stage_check CHECK ((stage = ANY (ARRAY['בהרצה'::text, 'הושלם'::text, 'לא רלוונטי'::text]))),
   constraint gr_tasks_stage_check CHECK ((stage = ANY (ARRAY['בעבודה'::text, 'הושלם'::text, 'לא רלוונטי'::text])))
 );
 
@@ -284,7 +283,7 @@ AS $function$
 begin
   if coalesce(new.deleted, false) = false then
     perform net.http_post(
-      url := 'https://zrftjkghhjhqzopvdzou.supabase.co/functions/v1/sh-gate',
+      url := 'https://bwlsogunthyqwklzkrrd.supabase.co/functions/v1/sh-gate',
       headers := jsonb_build_object('Content-Type', 'application/json'),
       body := jsonb_build_object('action', 'hook', 'app', 'gius-rag', 'kind', 'txn',
         'hook', (select value #>> '{}' from public.sh_keys where key = 'hook'),
@@ -392,4 +391,4 @@ create trigger gr_txns_notify AFTER INSERT ON public.gr_txns FOR EACH ROW EXECUT
 
 -- cron.schedule בשם קיים מעדכן את המשימה ואינו מוסיף שנייה
 -- cron.schedule בשם קיים מעדכן את המשימה ואינו מוסיף שנייה
-select cron.schedule('gr-dates', '0,30 * * * *', 'select net.http_post(url:=''https://zrftjkghhjhqzopvdzou.supabase.co/functions/v1/sh-gate'', headers:=''{"Content-Type":"application/json"}''::jsonb, body:=jsonb_build_object(''action'',''hook'',''app'',''gius-rag'',''kind'',''dates'',''hook'',(select value #>> ''{}'' from public.sh_keys where key=''hook'')), timeout_milliseconds:=20000)');
+select cron.schedule('gr-dates', '0,30 * * * *', 'select net.http_post(url:=''https://bwlsogunthyqwklzkrrd.supabase.co/functions/v1/sh-gate'', headers:=''{"Content-Type":"application/json"}''::jsonb, body:=jsonb_build_object(''action'',''hook'',''app'',''gius-rag'',''kind'',''dates'',''hook'',(select value #>> ''{}'' from public.sh_keys where key=''hook'')), timeout_milliseconds:=20000)');

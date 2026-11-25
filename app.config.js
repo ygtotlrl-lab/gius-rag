@@ -11,8 +11,8 @@ self.APP = Object.freeze({
   offline: { light: { bg: '#f3f5fa', ink: '#1b2440' }, dark: { bg: '#10151f', ink: '#e8edf5' } },
   // מפתח anon ציבורי ולא מפתח שירות — ההרשאות נאכפות במסד.
   supabase: {
-    url: 'https://zrftjkghhjhqzopvdzou.supabase.co',
-    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyZnRqa2doaGpocXpvcHZkem91Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzMDc4MzQsImV4cCI6MjEwMDg4MzgzNH0.DWcW3o4Y9Is3jGx1frHkrUz7cc045aH1m1uKsrwRhIA'
+    url: 'https://bwlsogunthyqwklzkrrd.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3bHNvZ3VudGh5cXdrbHprcnJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2MDYwNDYsImV4cCI6MjExMTE4MjA0Nn0.x7eRXcz37r6XOJdBRc25iJNaQV0s6BAJrOXZAvzoOAY'
   },
   // הכניסה — חובה, בחשבון Google מתוך רשימת המשתמשים (core/gauth.js); דרכים: google · password
   auth: { required: true, ways: ['google'] },
