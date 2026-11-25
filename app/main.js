@@ -107,18 +107,9 @@ var BK_CFG = {
   user: function () { var u = gauthUser(); return u ? (u.full_name || u.login) : null; },
   // secrets ריק — אין היום סוד, והמנגנון נשאר דרוך לסוד עתידי.
   secrets: [],
+  // המקורות — הטבלאות של האפליקציה (TABLES), ולא רשימה שמוקלדת שנית: טבלה שנוספה לאפליקציה נכנסת לגיבוי מעצמה.
   sources: function () {
-    return [
-      { name: 'gr_donors',       order: 'client_id', ts: 'updated_at' },
-      { name: 'gr_pledges',      order: 'client_id', ts: 'updated_at' },
-      { name: 'gr_txns',         order: 'client_id', ts: 'updated_at' },
-      { name: 'gr_plan_items',   order: 'client_id', ts: 'updated_at' },
-      { name: 'gr_tasks',        order: 'client_id', ts: 'updated_at' },
-      { name: 'gr_targets',      order: 'client_id', ts: 'updated_at' },
-      { name: 'gr_notes',        order: 'client_id', ts: 'updated_at' },
-      { name: KV_TABLE,         order: 'key',       ts: 'updated_at' },
-      { name: 'gr_lookups',      order: 'client_id', ts: 'updated_at' },
-    ];
+    return TABLES.map(function (x) { return { name: x.t, order: x.key, ts: 'updated_at' }; });
   }
 };
 
