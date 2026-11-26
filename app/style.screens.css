@@ -394,6 +394,10 @@ main #sht-give > .card{margin-bottom:var(--sp-6)}
 .yr-comply.none .yc-note{margin-top:-4px}
 /* ── הצעת גיוס לפי הקטגוריות (התכנית) ── */
 .sg h2{display:flex;align-items:baseline;gap:var(--sp-4)}
+.sg-edit{flex:none;align-self:center}
+.sg h2 .sg-tot{white-space:nowrap}
+.sg-f>span{display:flex;align-items:center;gap:var(--sp-3)}
+.sg-f>span .ico{width:16px;height:16px;color:var(--slate)}
 .sg-tot{margin-inline-start:auto;font-size:var(--fs-2);font-weight:700;color:var(--slate);font-variant-numeric:tabular-nums}
 .sg-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)}
 @media (min-width:900px){.sg-grid{grid-template-columns:repeat(4,1fr)}}
@@ -437,3 +441,17 @@ main #sht-give > .card{margin-bottom:var(--sp-6)}
 .nf-body{flex:1;min-height:50vh;border:0;background:none;font:inherit;font-size:var(--fs-4);line-height:1.7;color:var(--text);outline:none;resize:none;padding:0}
 .nf-title::placeholder,.nf-body::placeholder{color:var(--text-3)}
 .nf-colors{padding-top:var(--sp-4);border-top:1px solid rgba(0,0,0,.08)}
+
+/* סיכום הכרטיסים — עיגולים, כמו מצב ההלוואות בגיוס */
+.ln-dots{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:var(--sp-5) var(--sp-3)}
+.ln-dot{display:flex;flex-direction:column;align-items:center;text-align:center;gap:var(--sp-2);min-width:0}
+.ln-dot-c{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;background:var(--card-2);box-shadow:inset 0 0 0 3px var(--border)}
+.ln-dot-c b{font-size:var(--fs-5);font-weight:800;font-variant-numeric:tabular-nums;direction:ltr}
+.ln-dot.ok .ln-dot-c{background:var(--ok-soft);box-shadow:inset 0 0 0 3px color-mix(in srgb,var(--ok) 35%,transparent)} .ln-dot.ok b{color:var(--ok)}
+.ln-dot.gold .ln-dot-c{background:var(--warn-soft);box-shadow:inset 0 0 0 3px color-mix(in srgb,var(--warn) 35%,transparent)} .ln-dot.gold b{color:var(--warn)}
+.ln-dot-t{font-size:var(--fs-2);font-weight:800;color:var(--text)}
+.ln-dot small{font-size:var(--fs-1);color:var(--text-3);font-weight:600;line-height:1.3}
+/* בכרטיסים — ארבעה עיגולים בשורה אחת, מתחת לכלים, בקו מקווקו */
+.cs-dots{grid-template-columns:repeat(4,1fr);margin-top:var(--sp-6);padding-top:var(--sp-6);border-top:1px dashed var(--border)}
+.cs-dots .ln-dot-c{width:68px;height:68px}
+.cs-dots .ln-dot-c b{font-size:var(--fs-4)}

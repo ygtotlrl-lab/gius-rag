@@ -3,7 +3,7 @@
 import { readNum } from '../../core/util.js';
 import { pendTag } from '../../core/sync.js';
 import { comboValue, esc, openModal, toast } from '../../core/ui.js';
-import { CAT_SUGGEST, APP_FIRST_MONTH, LK_AMBASSADOR, LK_SECTION, MSG_PICK_DONOR, PLAN_KINDS, TTL_PLAN_EDIT, TTL_PLAN_NEW } from '../constants.js';
+import { KV_TABLE, CAT_SUGGEST, APP_FIRST_MONTH, LK_AMBASSADOR, LK_SECTION, MSG_PICK_DONOR, PLAN_KINDS, TTL_PLAN_EDIT, TTL_PLAN_NEW } from '../constants.js';
 import { state } from '../state.js';
 import { icon } from '../icons.js';
 import { snapShare } from '../../core/snap.js';
@@ -11,7 +11,7 @@ import { bar } from '../../core/chart.js';
 import { sectionIcon } from './dash.js';
 import { $, dmyDate, donorById, donorFieldHTML, donorName, emptyBox, gSortPlan, ils, insert,
          lookupLabels, monthLabel, nextSort, nullable, pendRowKey, planActual, planGroup, planOfMonth, pledgesOfDonor,
-         selectHTML, sum, update, val, monthTxnsInit, monthAmount, pledgeById } from '../domain.js';
+         selectHTML, settingJson, sum, update, upsertBy, val, monthTxnsInit, monthAmount, pledgeById } from '../domain.js';
 
 function viewPlan() {
   var m = state.planMonth, list = gSortPlan(planOfMonth(m));
@@ -58,15 +58,37 @@ function viewPlan() {
 }
 
 // הצעת הגיוס לפי הקטגוריות — לכל קטגוריה מה שמכוונים לגייס בחודש, ומה שנגבה בה בחודש המוצג (לפי הקטגוריה של ההתחייבות)
+// ההצעה — הסכומים שנקבעו בעריכה (`cat_suggest` בהגדרות: קטגוריה ⟵ סכום), ובלעדיהם — ברירת המחדל שבקוד
+var SUGGEST_KEY = 'cat_suggest';
+function catSuggest() {
+  var own = settingJson(SUGGEST_KEY, null) || {};
+  return CAT_SUGGEST.map(function (c) { return [c[0], own[c[0]] != null ? +own[c[0]] || 0 : c[1]]; });
+}
+function formSuggest() {
+  openModal('הצעת גיוס לפי הקטגוריות', catSuggest().map(function (c, i) {
+    return '<label class="fld sg-f"><span>' + icon(sectionIcon(c[0])) + esc(c[0]) + '</span>' +
+      '<input class="inp" data-amt id="sg-a-' + i + '" inputmode="decimal" value="' + (c[1] || '') + '"></label>';
+  }).join(''),
+    '<button class="btn ghost" data-act="modal-close">ביטול</button>' +
+    '<button class="btn" data-act="sg-save" data-ksave>' + icon('save') + 'שמירה</button>');
+}
+function saveSuggest() {
+  var o = {};
+  CAT_SUGGEST.forEach(function (c, i) { o[c[0]] = readNum($('#sg-a-' + i), 0); });
+  return upsertBy(KV_TABLE, { key: SUGGEST_KEY, value: JSON.stringify(o) });
+}
+
 function suggestHTML(m) {
   var got = {};
   monthTxnsInit(m).forEach(function (t) {
     var p = pledgeById(t.pledge_client_id), k = p && p.section ? p.section : '';
     got[k] = (got[k] || 0) + monthAmount(t, m);
   });
-  var total = sum(CAT_SUGGEST, function (c) { return c[1]; }), all = sum(CAT_SUGGEST, function (c) { return got[c[0]] || 0; });
-  return '<section class="card sg"><h2>הצעת גיוס לפי הקטגוריות<span class="sg-tot">' + ils(all) + ' / ' + ils(total) + '</span></h2>' +
-    '<div class="sg-grid">' + CAT_SUGGEST.map(function (c) {
+  var cs = catSuggest();
+  var total = sum(cs, function (c) { return c[1]; }), all = sum(cs, function (c) { return got[c[0]] || 0; });
+  return '<section class="card sg"><h2>הצעת גיוס לפי הקטגוריות<span class="sg-tot">' + ils(all) + ' / ' + ils(total) + '</span>' +
+      '<button class="btn ghost sm ic sg-edit" data-act="sg-edit" aria-label="עריכת ההצעה" title="עריכת ההצעה">' + icon('edit') + '</button></h2>' +
+    '<div class="sg-grid">' + cs.map(function (c) {
       var g = got[c[0]] || 0, pct = c[1] > 0 ? g / c[1] * 100 : 0;
       return '<div class="sg-it' + (g >= c[1] ? ' done' : '') + '"><span class="sg-ic">' + icon(sectionIcon(c[0])) + '</span>' +
         '<span class="sg-n">' + esc(c[0]) + '</span><b class="sg-v">' + ils(c[1]) + '</b>' +
@@ -151,4 +173,4 @@ function savePlan(id) {
                                                      sort: nextSort(planOfMonth(state.planMonth)) }));
 }
 
-export { formPlan, planShare, savePlan, viewPlan };
+export { formPlan, formSuggest, planShare, savePlan, saveSuggest, viewPlan };

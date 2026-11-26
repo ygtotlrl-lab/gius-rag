@@ -26,7 +26,7 @@ import { journalBody, journalShare, viewJournal } from './screens/journal.js';
 import { DATEPAIR_ACTIONS } from '../core/datepair.js';
 import { cardDial, cardNoteSave, datesToggle, datesAdd, datesDel, cardRowsHTML, cardShare, formDonor, methodPick, payPledgePick, formPay, formPledge, pSoSync, saveDonor, savePay, savePledge, soSync,
          soUneqToggle, viewCards } from './screens/cards.js';
-import { formPlan, planShare, savePlan, viewPlan } from './screens/plan.js';
+import { formPlan, formSuggest, planShare, savePlan, saveSuggest, viewPlan } from './screens/plan.js';
 import { dtClear, dtDay, dtDone, dtDow, dtInput, dtMon, dtToggle, formTask, saveTask, subAdd, subEdDot, subRm, taskStep, taskSubToggle, tasksBodyHTML, tasksShare, viewTasks } from './screens/tasks.js';
 import { closeNoteFull, formNote, noteColorPick, viewNotes } from './screens/notes.js';
 import { formTarget, formTargetDefault, lookupForm, saveTarget, saveTargetDefault,
@@ -367,6 +367,9 @@ var DOM_ACTIONS = {
   'plan-new': function () { formPlan(null); },
   'plan-edit': function (el) { var r = findIn(state.plan, el.dataset.id); if (r) formPlan(r); },
   'plan-save': saver(savePlan, MSG_SAVED_OK),
+  // הצעת הגיוס לפי הקטגוריות — עריכת הסכומים
+  'sg-edit': function () { formSuggest(); },
+  'sg-save': saver(saveSuggest, MSG_SAVED_OK),
   'plan-del': function (el) { return delAsk(MSG_DEL_PLAN, 'gr_plan_items', el.dataset.id); },
   // ידני בלבד — השורה יורדת לתחתית ואינה נספרת בצפי ובבפועל.
   'plan-irr': function (el) {
