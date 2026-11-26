@@ -107,9 +107,9 @@ var BK_CFG = {
   user: function () { var u = gauthUser(); return u ? (u.full_name || u.login) : null; },
   // secrets ריק — אין היום סוד, והמנגנון נשאר דרוך לסוד עתידי.
   secrets: [],
-  // המקורות — הטבלאות של האפליקציה (TABLES), ולא רשימה שמוקלדת שנית: טבלה שנוספה לאפליקציה נכנסת לגיבוי מעצמה.
+  // המקורות — הטבלאות שהאפליקציה דוחפת (PUSH_TABLES), ולא רשימה שמוקלדת שנית: טבלה שנוספה לסנכרון נכנסת לגיבוי מעצמה.
   sources: function () {
-    return TABLES.map(function (x) { return { name: x.t, order: x.key, ts: 'updated_at' }; });
+    return PUSH_TABLES.map(function (t) { return { name: t, order: t === KV_TABLE ? 'key' : 'client_id', ts: 'updated_at' }; });
   }
 };
 
