@@ -39,8 +39,6 @@ var LISTS = [
 ];
 
 // ── המשימות ──
-// שלושת האחראים קבועים — אין להם רשימה בהגדרות.
-var ASSIGNEES = ['הרב ליפש', 'הרב מישולובין'];
 
 // הצעת הגיוס החודשית לכל קטגוריה — מה שמכוונים לגייס בחודש, בתחתית התכנית
 var CAT_SUGGEST = [['גבירים', 10000], ['הו״ק', 500], ['הקדשת התוועדויות שבת', 2000], ['עליות לתורה', 1500],
@@ -68,11 +66,11 @@ var TABS = [
   { id: 'dash', ic: 'dash', label: 'דשבורד' },
   { id: 'cards', ic: 'cards', label: 'כרטיסים', title: 'כרטיסים ותשלומים' },
   { id: 'plan', ic: 'plan', label: 'תכנית' },
-  { id: 'journal', ic: 'journal', label: 'יומן', title: 'יומן עבודה' }
+  { id: 'tasks', ic: 'tasks', label: 'משימות' }
 ];
 
 var MORE = [
-  { id: 'tasks', ic: 'tasks', label: 'משימות' },
+  { id: 'journal', ic: 'journal', label: 'יומן', title: 'יומן עבודה' },
   { id: 'notes', ic: 'notes', label: 'פתקים' },
   { id: 'settings', ic: 'settings', label: 'הגדרות' }
 ];
@@ -93,6 +91,14 @@ var MSG_CK_FIRST = 'נא לבחור את חודש התשלום הראשון';
 var MSG_LOAN_KIND = 'נא לבחור את סוג ההחזר';
 var MSG_CK_SUM_PRE = 'סך התשלומים פחות מסכום ההלוואה: ';
 var MSG_NEED_TITLE = 'נא למלא כותרת';
+// מסך המשימות — החלקים של «בעבודה», בסדרם, והשאלות שבעיגול
+var TASK_SECTIONS = [['soon', 'החודש הקרוב'], ['late', 'עבר זמנן'], ['none', 'ללא תאריך'], ['later', 'מאוחר יותר']];
+var TASK_SOON_DAYS = 30;
+var MSG_TASK_DONE_Q = 'להעביר את המשימה להושלמה?';
+var MSG_TASK_DONE_ACT = 'הושלמה';
+var MSG_TASK_BACK_Q = 'להחזיר את המשימה לעבודה?';
+var MSG_TASK_BACK_ACT = 'חזרה לעבודה';
+var MSG_TASK_NEXT = 'המשימה החוזרת נקבעה ל-';
 var MSG_NEED_VALUE = 'נא להזין ערך';
 var MSG_VALUE_EXISTS = 'הערך כבר קיים ברשימה';
 var MSG_PICK_DONOR = 'נא לבחור כרטיס';
@@ -173,7 +179,7 @@ var MSG_GOAL_SAVED = 'היעד נשמר';
 var MSG_GOAL_RESET = 'החודש חזר ליעד הקבוע';
 var MSG_GOAL_DEFAULT_SAVED = 'היעד הקבוע נשמר';
 
-export { CAT_SUGGEST, ASSIGNEES, DONOR_NEW_LABEL, DONOR_NO_PHONE, EPS, KV_TABLE, LISTS, LK_AFFIL, LK_AMBASSADOR,
+export { TASK_SECTIONS, TASK_SOON_DAYS, MSG_TASK_DONE_Q, MSG_TASK_DONE_ACT, MSG_TASK_BACK_Q, MSG_TASK_BACK_ACT, MSG_TASK_NEXT, CAT_SUGGEST, DONOR_NEW_LABEL, DONOR_NO_PHONE, EPS, KV_TABLE, LISTS, LK_AFFIL, LK_AMBASSADOR,
          LK_DOMAIN, LK_METHOD, LK_PTYPE, LK_SECTION, MORE,
          METHOD_SO, MSG_AMOUNT_POSITIVE, MSG_SO_COUNT, MSG_SO_FIRST, MSG_SO_FIRST_OVER, MSG_DELETE_ACT, MSG_DEL_DONOR,
          MSG_DEL_LOOKUP, MSG_DEL_NOTE, MSG_DEL_PAY, MSG_DEL_PLAN, MSG_DEL_PLEDGE, MSG_DEL_SOFT,

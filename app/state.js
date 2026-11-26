@@ -1,5 +1,4 @@
 // app/state.js — המצב המשותף בין המודולים
-import { ASSIGNEES } from './constants.js';
 
 // מצב שמודולים שונים כותבים — אובייקט אחד, כי קישור מיובא אינו ניתן להשמה.
 const S = {
@@ -32,7 +31,7 @@ var state = {
   // יומן העבודה — היום המוצג (ISO), והארכיון פתוח או סגור.
   jDay: '', jArc: false,
   // משימות — האחראי שנבחר, והרשימה שנפתחה (שלב), או null לשלושת הכרטיסים.
-  tasks_ui: { who: ASSIGNEES[0], stage: null, q: '' }
+  tasks_ui: { who: '', q: '', extra: '' }
 };
 
 // ── מה שמסך צריך מ-main ──
