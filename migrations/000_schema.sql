@@ -109,9 +109,7 @@ CREATE OR REPLACE FUNCTION public.bk_retention_keys()
 AS $function$
   select coalesce(array_agg(distinct b.key), '{}'::text[])
     from (select distinct key from public.sh_backup) b
-   where exists (select 1 from pg_tables t
-                  where t.schemaname = 'public' and t.tablename not like 'sh\_%'
-                    and b.key ~ ('^(ANCHOR|DIFF):([a-z]+_)?' || t.tablename || '$'))
+   where b.key like 'ANCHOR:%' or b.key like 'DIFF:%'
 $function$;
 revoke all on function public.bk_retention_keys() from public, anon, authenticated, service_role;
 grant execute on function public.bk_retention_keys() to service_role;
@@ -562,34 +560,34 @@ grant execute on function public.gr_txns_notify() to service_role;
 
 -- revoke לפני grant — GRANT מוסיף ואינו מחליף, וטבלה חדשה ב-Supabase נולדת עם DELETE ו-TRUNCATE ל-anon.
 revoke all on table public.gr_donors from anon, authenticated;
-grant select, insert, update on table public.gr_donors to authenticated;
+grant select, insert, update on table public.gr_donors to anon, authenticated;
 grant all on table public.gr_donors to service_role;
 revoke all on table public.gr_journal from anon, authenticated;
-grant select, insert, update on table public.gr_journal to authenticated;
+grant select, insert, update on table public.gr_journal to anon, authenticated;
 grant all on table public.gr_journal to service_role;
 revoke all on table public.gr_lookups from anon, authenticated;
-grant select, insert, update on table public.gr_lookups to authenticated;
+grant select, insert, update on table public.gr_lookups to anon, authenticated;
 grant all on table public.gr_lookups to service_role;
 revoke all on table public.gr_notes from anon, authenticated;
 grant select, insert, update on table public.gr_notes to anon, authenticated;
 grant all on table public.gr_notes to service_role;
 revoke all on table public.gr_plan_items from anon, authenticated;
-grant select, insert, update on table public.gr_plan_items to authenticated;
+grant select, insert, update on table public.gr_plan_items to anon, authenticated;
 grant all on table public.gr_plan_items to service_role;
 revoke all on table public.gr_pledges from anon, authenticated;
-grant select, insert, update on table public.gr_pledges to authenticated;
+grant select, insert, update on table public.gr_pledges to anon, authenticated;
 grant all on table public.gr_pledges to service_role;
 revoke all on table public.gr_settings from anon, authenticated;
-grant select, insert, update on table public.gr_settings to authenticated;
+grant select, insert, update on table public.gr_settings to anon, authenticated;
 grant all on table public.gr_settings to service_role;
 revoke all on table public.gr_targets from anon, authenticated;
-grant select, insert, update on table public.gr_targets to authenticated;
+grant select, insert, update on table public.gr_targets to anon, authenticated;
 grant all on table public.gr_targets to service_role;
 revoke all on table public.gr_tasks from anon, authenticated;
-grant select, insert, update on table public.gr_tasks to authenticated;
+grant select, insert, update on table public.gr_tasks to anon, authenticated;
 grant all on table public.gr_tasks to service_role;
 revoke all on table public.gr_txns from anon, authenticated;
-grant select, insert, update on table public.gr_txns to authenticated;
+grant select, insert, update on table public.gr_txns to anon, authenticated;
 grant all on table public.gr_txns to service_role;
 revoke all on table public.gr_users from anon, authenticated;
 grant select on table public.gr_users to authenticated;
