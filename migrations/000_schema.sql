@@ -421,6 +421,7 @@ create table if not exists public.gr_pledges (
   constraint gr_pledges_donor_fk FOREIGN KEY (donor_client_id) REFERENCES gr_donors(client_id) ON DELETE RESTRICT,
   constraint gr_pledges_amb_req CHECK (((ambassador IS NOT NULL) AND (ambassador <> ''::text))),
   constraint gr_pledges_amount_check CHECK (((amount IS NULL) OR (amount >= (0)::numeric))),
+  constraint gr_pledges_section_req CHECK ((deleted OR ((section IS NOT NULL) AND (section <> ''::text)))),
   constraint gr_pledges_type_req CHECK (((pledge_type IS NOT NULL) AND (pledge_type <> ''::text)))
 );
 
