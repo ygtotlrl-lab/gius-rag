@@ -2,109 +2,19 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex">
 <title>אישור גישה</title>
-<!-- oauth/consent — דף האישור של המחבר של קלוד (OAuth 2.1 של Supabase): כניסה עם Google, בדיקה ברשימת המשתמשים, ואישור או סירוב -->
+<!-- oauth/consent — דף האישור של המחבר של קלוד: מעטפת בלבד, והדף כולו במודול הליבה core/consent.js -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/dist/umd/supabase.js" crossorigin="anonymous"></script>
 <script src="../../app.config.js"></script>
-<style>
-  :root { --brand: #0B55A6; --bg: #f3f5fa; --ink: #1b2440; --muted: #5d6680; --card: #fff; --line: #dfe4ee; --bad: #b3261e; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #10151f; --ink: #e8edf5; --muted: #9aa6bd; --card: #182132; --line: #2a3650; } }
-  * { box-sizing: border-box; }
-  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--ink);
-         font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; padding: 20px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 28px 24px; width: 100%; max-width: 380px; text-align: center; }
-  .logo { width: 56px; height: 56px; border-radius: 14px; }
-  h1 { font-size: 20px; margin: 14px 0 6px; }
-  p { color: var(--muted); font-size: 15px; line-height: 1.6; margin: 6px 0; }
-  .who { font-weight: 600; color: var(--ink); }
-  .row { display: flex; gap: 10px; margin-top: 20px; }
-  button { flex: 1; font: inherit; font-size: 16px; border-radius: 999px; padding: 12px; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--ink); }
-  button.ok { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
-  button:disabled { opacity: .6; cursor: default; }
-  #gsi { display: flex; justify-content: center; margin-top: 18px; min-height: 44px; }
-  .err { color: var(--bad); }
-</style>
+<link rel="stylesheet" href="../../core/ui.css">
+<link rel="stylesheet" href="../../app/style.css">
+<link rel="stylesheet" href="../../core/consent.css">
 </head>
-<body>
-<main class="card">
-  <img class="logo" id="logo" alt="" hidden>
-  <h1 id="title">אישור גישה</h1>
-  <div id="body"><p>טוען…</p></div>
-</main>
-<script>
-(function () {
-  var APP = self.APP || {};
-  var $title = document.getElementById('title'), $body = document.getElementById('body');
-  var authId = new URLSearchParams(location.search).get('authorization_id');
-  var sb = supabase.createClient(APP.supabase.url, APP.supabase.key, {
-    // אותו מפתח סשן כמו באפליקציה — מי שכבר מחובר בדפדפן הזה אינו נכנס שוב
-    auth: { storageKey: 'sb-auth-' + APP.id, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-  });
-  // הסמל — מהמניפסט, שבו שם הקובץ נושא את החתימה שלו
-  fetch('../../manifest.json').then(function (r) { return r.json(); }).then(function (m) {
-    var i = (m.icons || []).filter(function (x) { return /192/.test(x.sizes || ''); })[0];
-    if (i) { var el = document.getElementById('logo'); el.src = new URL(i.src, new URL('../../', location.href)).href; el.hidden = false; }
-  }).catch(function () {});
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function show(t, html) { $title.textContent = t; $body.innerHTML = html; }
-  function fail(msg) { show('לא ניתן להמשיך', '<p class="err">' + esc(msg) + '</p>'); }
-  function go(d) { var u = d && (d.redirect_url || d.redirect_to || d.url); if (u) { location.replace(u); return true; } return false; }
-
-  async function signIn() {
-    show('כניסה', '<p>כדי לחבר את קלוד ל' + esc(APP.name) + ', יש להיכנס עם חשבון Google שרשום באפליקציה.</p><div id="gsi"></div>');
-    await new Promise(function (resolve) {
-      var sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
-      sc.onload = resolve; sc.onerror = resolve; document.head.appendChild(sc);
-    });
-    if (!(self.google && google.accounts && google.accounts.id)) { fail('הכניסה עם Google לא נטענה. נסו לרענן את הדף.'); return; }
-    google.accounts.id.initialize({
-      client_id: (APP.android || {}).google, ux_mode: 'popup', auto_select: false,
-      callback: async function (resp) {
-        var r = await sb.auth.signInWithIdToken({ provider: 'google', token: resp.credential });
-        if (r.error) { fail('הכניסה נכשלה.'); return; }
-        run();
-      }
-    });
-    google.accounts.id.renderButton(document.getElementById('gsi'), { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', locale: 'he', width: 300 });
-  }
-
-  async function run() {
-    if (!authId) { fail('חסר מזהה הבקשה. יש להתחיל את החיבור מתוך קלוד.'); return; }
-    var s = (await sb.auth.getSession()).data.session;
-    if (!s) { signIn(); return; }
-    var email = String(s.user.email || '').toLowerCase();
-    // המסד מחזיר את השורה רק למי שברשימת המשתמשים ופעיל
-    var u = await sb.from(APP.prefix + 'users').select('full_name').eq('login', email).maybeSingle();
-    if (u.error || !u.data) {
-      show('אין גישה', '<p>החשבון <span class="who">' + esc(email) + '</span> אינו ברשימת המשתמשים של ' + esc(APP.name) + '.</p>' +
-        '<div class="row"><button id="other">כניסה בחשבון אחר</button></div>');
-      document.getElementById('other').onclick = async function () { await sb.auth.signOut({ scope: 'local' }); signIn(); };
-      return;
-    }
-    var det = await sb.auth.oauth.getAuthorizationDetails(authId);
-    if (det.error) { fail('הבקשה אינה תקפה או שפג תוקפה. יש להתחיל את החיבור מחדש מתוך קלוד.'); return; }
-    if (go(det.data)) return;
-    var client = (det.data && det.data.client && (det.data.client.name || det.data.client.client_name)) || 'אפליקציה';
-    show('אישור גישה',
-      '<p><span class="who">' + esc(client) + '</span> מבקש גישה ל' + esc(APP.name) + ' בשמך.</p>' +
-      '<p>מחובר: <span class="who">' + esc(u.data.full_name || email) + '</span></p>' +
-      '<p>הגישה כפופה להרשאות שלך באפליקציה: קריאה, הוספה, עדכון ומחיקה רכה.</p>' +
-      '<div class="row"><button class="ok" id="yes">אישור</button><button id="no">סירוב</button></div>');
-    document.getElementById('yes').onclick = async function () {
-      this.disabled = true; document.getElementById('no').disabled = true;
-      var r = await sb.auth.oauth.approveAuthorization(authId);
-      if (r.error || !go(r.data)) fail('האישור נכשל. יש לנסות שוב מתוך קלוד.');
-    };
-    document.getElementById('no').onclick = async function () {
-      this.disabled = true; document.getElementById('yes').disabled = true;
-      var r = await sb.auth.oauth.denyAuthorization(authId);
-      if (r.error || !go(r.data)) show('הגישה נדחתה', '<p>אפשר לסגור את הדף.</p>');
-    };
-  }
-  run().catch(function (e) { console.error(e); fail('שגיאה לא צפויה.'); });
-})();
-</script>
+<body class="cs-page">
+<main class="cs-card" id="consent"></main>
+<script src="../../core/consent.js"></script>
 </body>
 </html>
