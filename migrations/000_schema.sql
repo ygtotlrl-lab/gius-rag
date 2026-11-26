@@ -337,7 +337,8 @@ create table if not exists public.gr_donors (
   starred boolean not null default false,
   is_general boolean not null default false,
   dates jsonb not null default '[]'::jsonb,
-  constraint gr_donors_pkey PRIMARY KEY (client_id)
+  constraint gr_donors_pkey PRIMARY KEY (client_id),
+  constraint gr_donors_name_req CHECK ((COALESCE(deleted, false) OR (name <> ''::text)))
 );
 
 create table if not exists public.gr_journal (
@@ -363,7 +364,8 @@ create table if not exists public.gr_lookups (
   deleted boolean default false,
   deleted_at timestamp with time zone,
   deleted_by text,
-  constraint gr_lookups_pkey PRIMARY KEY (client_id)
+  constraint gr_lookups_pkey PRIMARY KEY (client_id),
+  constraint gr_lookups_label_req CHECK ((COALESCE(deleted, false) OR (label <> ''::text)))
 );
 
 create table if not exists public.gr_notes (
@@ -468,7 +470,8 @@ create table if not exists public.gr_tasks (
   starred boolean not null default false,
   subtasks jsonb not null default '[]'::jsonb,
   constraint gr_tasks_pkey PRIMARY KEY (client_id),
-  constraint gr_tasks_stage_check CHECK ((stage = ANY (ARRAY['בעבודה'::text, 'הושלם'::text, 'לא רלוונטי'::text])))
+  constraint gr_tasks_stage_check CHECK ((stage = ANY (ARRAY['בעבודה'::text, 'הושלם'::text, 'לא רלוונטי'::text]))),
+  constraint gr_tasks_title_req CHECK ((COALESCE(deleted, false) OR (title <> ''::text)))
 );
 
 create table if not exists public.gr_txns (
