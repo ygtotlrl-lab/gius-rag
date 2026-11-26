@@ -143,7 +143,7 @@ function planSecOf(d) {
 function formPlan(r) {
   var d = r ? donorById(r.donor_client_id) : null;
   openModal(r ? TTL_PLAN_EDIT : TTL_PLAN_NEW + monthLabel(state.planMonth),
-    '<div class="fld"><span>כרטיס *</span>' + donorFieldHTML('pl-donor', 'donor-plan', r ? r.donor_client_id : null) + '</div>' +
+    '<div class="fld"><span>שם *</span>' + donorFieldHTML('pl-donor', 'donor-plan', r ? r.donor_client_id : null) + '</div>' +
     '<label class="fld"><span>קטגוריה</span>' + selectHTML('pl-sec', lookupLabels(LK_SECTION), r ? r.section : planSecOf(d), '— ללא —') + '</label>' +
     '<div class="f2">' +
       '<label class="fld"><span>סוג</span><select class="inp" id="pl-kind">' + PLAN_KINDS.map(function (k) {
@@ -152,7 +152,7 @@ function formPlan(r) {
       '<label class="fld"><span>צפי</span><input class="inp" data-amt id="pl-exp" inputmode="decimal" value="' + esc(r && r.expected != null ? r.expected : '') + '"></label>' +
     '</div>' +
     '<div class="f2">' +
-      '<label class="fld"><span>איש קשר</span>' + selectHTML('pl-amb', lookupLabels(LK_AMBASSADOR), r ? r.ambassador : (d && d.ambassador) || '', '— ללא —') + '</label>' +
+      '<label class="fld"><span>שגריר</span>' + selectHTML('pl-amb', lookupLabels(LK_AMBASSADOR), r ? r.ambassador : (d && d.ambassador) || '', '— ללא —') + '</label>' +
       '<label class="fld"><span>תאריך טיפול</span><input class="inp" type="date" id="pl-care" value="' + esc(r && r.care_date ? r.care_date : '') + '"></label>' +
     '</div>' +
     '<label class="fld"><span>הערות</span><input class="inp" id="pl-note" value="' + esc(r ? r.note || '' : '') + '"></label>',
