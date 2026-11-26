@@ -629,7 +629,7 @@ drop policy if exists gr_txns_users on public.gr_txns;
 create policy gr_txns_users on public.gr_txns as permissive for all to authenticated using (gr_is_user()) with check (gr_is_user());
 alter table public.gr_users enable row level security;
 drop policy if exists gr_users_select on public.gr_users;
-create policy gr_users_select on public.gr_users as permissive for select to authenticated using (gr_is_user());
+create policy gr_users_select on public.gr_users as permissive for select to authenticated using (gr_is_user() and login = lower(auth.jwt() ->> 'email'));
 
 drop trigger if exists gr_donors_history on public.gr_donors;
 create trigger gr_donors_history AFTER INSERT OR DELETE OR UPDATE ON public.gr_donors FOR EACH ROW EXECUTE FUNCTION sh_history_log('client_id');
