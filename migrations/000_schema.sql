@@ -271,7 +271,7 @@ grant all on table public.sh_auth_log to service_role;
 revoke all on sequence public.sh_auth_log_id_seq from anon, authenticated;
 grant usage, select, update on sequence public.sh_auth_log_id_seq to anon, authenticated, service_role;
 revoke all on table public.sh_backup from anon, authenticated;
-grant select, insert on table public.sh_backup to anon, authenticated;
+grant insert on table public.sh_backup to anon, authenticated;
 grant all on table public.sh_backup to service_role;
 revoke all on sequence public.sh_backup_id_seq from anon, authenticated;
 grant usage, select, update on sequence public.sh_backup_id_seq to anon, authenticated, service_role;
@@ -289,7 +289,7 @@ grant all on table public.sh_push to service_role;
 revoke all on sequence public.sh_push_id_seq from anon, authenticated;
 grant usage, select, update on sequence public.sh_push_id_seq to anon, authenticated, service_role;
 revoke all on table public.sh_sync_log from anon, authenticated;
-grant select, insert on table public.sh_sync_log to anon, authenticated;
+grant insert on table public.sh_sync_log to anon, authenticated;
 grant all on table public.sh_sync_log to service_role;
 revoke all on sequence public.sh_sync_log_id_seq from anon, authenticated;
 grant usage, select, update on sequence public.sh_sync_log_id_seq to anon, authenticated, service_role;
@@ -298,8 +298,6 @@ alter table public.sh_auth_log enable row level security;
 alter table public.sh_backup enable row level security;
 drop policy if exists sh_backup_insert on public.sh_backup;
 create policy sh_backup_insert on public.sh_backup as permissive for insert to authenticated with check (( SELECT sh_is_user() AS sh_is_user));
-drop policy if exists sh_backup_select on public.sh_backup;
-create policy sh_backup_select on public.sh_backup as permissive for select to authenticated using (( SELECT sh_is_user() AS sh_is_user));
 alter table public.sh_history enable row level security;
 alter table public.sh_keys enable row level security;
 alter table public.sh_logins enable row level security;
@@ -307,8 +305,6 @@ alter table public.sh_push enable row level security;
 alter table public.sh_sync_log enable row level security;
 drop policy if exists sh_sync_log_insert on public.sh_sync_log;
 create policy sh_sync_log_insert on public.sh_sync_log as permissive for insert to authenticated with check (( SELECT sh_is_user() AS sh_is_user));
-drop policy if exists sh_sync_log_select on public.sh_sync_log;
-create policy sh_sync_log_select on public.sh_sync_log as permissive for select to authenticated using (( SELECT sh_is_user() AS sh_is_user));
 
 -- cron.schedule בשם קיים מעדכן את המשימה ואינו מוסיף שנייה
 select cron.schedule('bk_retention_daily', '0 3 * * *', 'select public.bk_retention_sweep(30);');
@@ -422,7 +418,10 @@ create table if not exists public.gr_pledges (
   detail text,
   ambassador text,
   constraint gr_pledges_pkey PRIMARY KEY (client_id),
-  constraint gr_pledges_donor_fk FOREIGN KEY (donor_client_id) REFERENCES gr_donors(client_id) ON DELETE RESTRICT
+  constraint gr_pledges_donor_fk FOREIGN KEY (donor_client_id) REFERENCES gr_donors(client_id) ON DELETE RESTRICT,
+  constraint gr_pledges_amb_req CHECK (((ambassador IS NOT NULL) AND (ambassador <> ''::text))),
+  constraint gr_pledges_amount_check CHECK (((amount IS NULL) OR (amount >= (0)::numeric))),
+  constraint gr_pledges_type_req CHECK (((pledge_type IS NOT NULL) AND (pledge_type <> ''::text)))
 );
 
 create table if not exists public.gr_settings (
@@ -492,6 +491,7 @@ create table if not exists public.gr_txns (
   constraint gr_txns_pkey PRIMARY KEY (client_id),
   constraint gr_txns_donor_fk FOREIGN KEY (donor_client_id) REFERENCES gr_donors(client_id) ON DELETE RESTRICT,
   constraint gr_txns_pledge_fk FOREIGN KEY (pledge_client_id) REFERENCES gr_pledges(client_id) ON DELETE RESTRICT,
+  constraint gr_txns_amount_check CHECK ((amount > (0)::numeric)),
   constraint g_txns_first_installment_check CHECK (((first_installment IS NULL) OR ((installments IS NOT NULL) AND (first_installment > (0)::numeric) AND (first_installment <= amount)))),
   constraint g_txns_installments_check CHECK (((installments IS NULL) OR (installments >= 2))),
   constraint g_txns_txn_month_check CHECK (((txn_month IS NULL) OR (txn_month ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'::text)))
