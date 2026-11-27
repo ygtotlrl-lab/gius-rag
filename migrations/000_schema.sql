@@ -517,7 +517,7 @@ create table if not exists public.gr_users (
 );
 
 create index if not exists gr_donors_deleted_name_idx ON public.gr_donors USING btree (deleted, name);
-create unique index if not exists gr_journal_day_section ON public.gr_journal USING btree (jday, section) WHERE (NOT deleted);
+create unique index if not exists gr_journal_day_section ON public.gr_journal USING btree (owner, jday, section) WHERE (NOT deleted);
 create index if not exists gr_lookups_kind_sort_idx ON public.gr_lookups USING btree (kind, sort);
 create index if not exists gr_plan_items_deleted_plan_month_idx ON public.gr_plan_items USING btree (deleted, plan_month);
 create index if not exists gr_plan_items_donor_client_id_idx ON public.gr_plan_items USING btree (donor_client_id);
@@ -536,6 +536,12 @@ CREATE OR REPLACE FUNCTION public.gr_is_user()
 AS $function$ select exists (select 1 from public.gr_users u where u.login = lower(auth.jwt() ->> 'email') and u.active) $function$;
 revoke all on function public.gr_is_user() from public, anon, authenticated, service_role;
 grant execute on function public.gr_is_user() to authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.gr_is_admin()
+ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $f$ select exists (select 1 from public.gr_users u where u.login = lower(auth.jwt() ->> 'email') and u.active and u.role = 'admin') $f$;
+revoke all on function public.gr_is_admin() from public, anon, authenticated, service_role;
+grant execute on function public.gr_is_admin() to authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.gr_txns_notify()
  RETURNS trigger
@@ -601,8 +607,18 @@ alter table public.gr_donors enable row level security;
 drop policy if exists gr_donors_users on public.gr_donors;
 create policy gr_donors_users on public.gr_donors as permissive for all to authenticated using (gr_is_user()) with check (gr_is_user());
 alter table public.gr_journal enable row level security;
+-- היומן אישי — כל משתמש קורא וכותב את שלו, והמנהל קורא את כולם (gr_is_admin); כתיבה — רק ביומן של עצמו.
 drop policy if exists gr_journal_users on public.gr_journal;
-create policy gr_journal_users on public.gr_journal as permissive for all to authenticated using (gr_is_user()) with check (gr_is_user());
+drop policy if exists gr_journal_select on public.gr_journal;
+drop policy if exists gr_journal_insert on public.gr_journal;
+drop policy if exists gr_journal_update on public.gr_journal;
+create policy gr_journal_select on public.gr_journal as permissive for select to authenticated
+  using (gr_is_user() and (owner = lower(auth.jwt() ->> 'email') or gr_is_admin()));
+create policy gr_journal_insert on public.gr_journal as permissive for insert to authenticated
+  with check (gr_is_user() and owner = lower(auth.jwt() ->> 'email'));
+create policy gr_journal_update on public.gr_journal as permissive for update to authenticated
+  using (gr_is_user() and owner = lower(auth.jwt() ->> 'email'))
+  with check (gr_is_user() and owner = lower(auth.jwt() ->> 'email'));
 alter table public.gr_lookups enable row level security;
 drop policy if exists gr_lookups_users on public.gr_lookups;
 create policy gr_lookups_users on public.gr_lookups as permissive for all to authenticated using (gr_is_user()) with check (gr_is_user());
