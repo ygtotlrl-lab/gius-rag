@@ -29,7 +29,7 @@ var state = {
   // כרטיסים ותשלומים — בכל כניסה למסך: בלי סינון, ממוין לפי א״ב, ובלי כרטיס פתוח.
   cards: { q: '', aff: '', pf: '', sort: 'sum', open: null, plOpen: null, tlOpen: false },
   // יומן העבודה — היום המוצג (ISO), והארכיון פתוח או סגור.
-  jDay: '', jArc: false,
+  jDay: '', jArc: false, jWho: '',
   // משימות — האחראי שנבחר, והרשימה שנפתחה (שלב), או null לשלושת הכרטיסים.
   tasks_ui: { who: '', q: '', extra: '' }
 };

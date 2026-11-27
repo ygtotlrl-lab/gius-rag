@@ -236,7 +236,7 @@ function go(screen) {
   if (screen === 'plan') { state.planMonth = m; state.planOpen = {}; }
   if (screen === 'cards') state.cards = { q: '', aff: '', pf: '', sort: 'sum', open: null, plOpen: null, tlOpen: false };
   if (screen === 'tasks') { state.tasks_ui.extra = ''; state.tasks_ui.q = ''; }
-  if (screen === 'journal') { state.jDay = dayToday(); state.jArc = false; }
+  if (screen === 'journal') { state.jDay = dayToday(); state.jArc = false; state.jWho = ''; }
   closeModal();
   render();
 }
@@ -509,6 +509,7 @@ document.addEventListener('change', function (e) {
   if (el.dataset.chg === 'note-color') { noteColorPick(el.value); return; }
   if (el.dataset.inp === 'dtp-rep' || el.dataset.inp === 'dtp-c') { dtInput(el); return; }
   if (el.dataset.inp === 'card-note') { var pn = cardNoteSave(el); if (pn) pn.then(function () { render(); }).catch(errToast); return; }
+  if (el.dataset.chg === 'j-who') { state.jWho = el.value; state.jArc = false; render(); return; }
   if (el.dataset.chg === 'cards-aff') { state.cards.aff = el.value; cardsRefresh(); return; }
   if (el.dataset.chg === 'cards-pf') { state.cards.pf = el.value; cardsRefresh(); return; }
   if (el.dataset.chg === 'p-now') { var nb = $('#p-now-box'); if (nb) nb.hidden = !el.checked; return; }
