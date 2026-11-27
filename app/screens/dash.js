@@ -77,18 +77,14 @@ function breakdownHTML(rows, total, withIcon) {
   }).join('') + '</div>';
 }
 
-// מצב המשימות לכל אחראי — שלושת השלבים ומספריהם, והמספר הבולט — בעבודה; מנותב למסך המשימות.
+// המשימות בעבודה לכל אחראי — השם, ובצד השמאלי המספר בלבד; מנותב למסך המשימות.
 function tasksHTML() {
+  var st = STAGES[0].id;
   return '<div class="who-grid">' + assigneeNames().map(function (who) {
-    var mine = state.tasks.filter(function (t) { return t.assignee === who; });
-    var cnt = function (st) { return mine.filter(function (t) { return t.stage === st; }).length; };
+    var n = state.tasks.filter(function (t) { return t.assignee === who && t.stage === st; }).length;
     return '<button class="who-card" data-act="dash-who" data-who="' + esc(who) + '">' +
-      '<span class="who-main"><b>' + esc(who) + '</b>' +
-        '<span class="who-stages">' + STAGES.map(function (s) {
-          return '<span class="pill ' + s.cls + '">' + esc(s.id) + ' · ' + cnt(s.id) + '</span>';
-        }).join('') + '</span></span>' +
-      '<span class="who-total" aria-label="' + cnt(STAGES[0].id) + ' משימות ' + esc(STAGES[0].id) + '">' + cnt(STAGES[0].id) +
-        '<small>' + esc(STAGES[0].id) + '</small></span></button>';
+      '<span class="who-main"><b>' + esc(who) + '</b></span>' +
+      '<span class="who-total" aria-label="' + n + ' משימות ' + esc(st) + '">' + n + '</span></button>';
   }).join('') + '</div>';
 }
 
@@ -174,7 +170,7 @@ function viewDash() {
       breakdownHTML(groupBy(txns, function (t) { return pledgeField(t, 'section'); }, 'ללא קטגוריה', m), collected, true) +
     '</section>';
 
-  h += '<section class="card"><h2>משימות</h2>' + tasksHTML() + '</section>';
+  h += '<section class="card"><h2>משימות בעבודה</h2>' + tasksHTML() + '</section>';
 
   // תשלום שלא סומן «סליקה בפועל» — שקוף מעט; הוא נספר בנגבה כמו כל תשלום.
   // שלושה אחרונים, והשאר בלחיצה — הרשימה המלאה ארוכה מדי לראש הלוח.
